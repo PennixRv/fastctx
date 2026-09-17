@@ -6,8 +6,8 @@ use super::jobs::{JobsDetail, JobsState, JobsViewport, visible_job_count, visibl
 use super::migration::{self as migration_copy, MigrationMessages};
 use super::update::{self as update_copy, UpdateMessages};
 use crate::control::apply::{
-    ApplyOptions, ApplyPlan, OperationReceipt, UnapplyOptions, UnapplyPlan, commit_apply,
-    commit_unapply, plan_apply, plan_unapply,
+    ApplyOptions, ApplyPlan, GuidanceMode, OperationReceipt, UnapplyOptions, UnapplyPlan,
+    commit_apply, commit_unapply, plan_apply, plan_unapply,
 };
 use crate::control::config_i18n::{self, ConfigMessages};
 use crate::control::doctor::{self, DoctorReport};
@@ -761,6 +761,7 @@ impl App {
                     tool_budgets: self.settings.tool_budgets,
                     output_guard_enabled: self.settings.output_guard.enabled,
                     fastshell_enabled: self.settings.fastshell.enabled,
+                    guidance: GuidanceMode::Managed,
                     current_executable: self.current_executable.clone(),
                 },
             )

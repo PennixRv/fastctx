@@ -21,8 +21,8 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use url::Url;
 
-const GITHUB_LATEST_URL: &str = "https://github.com/yc-duan/fastctx/releases/latest";
-const GITHUB_RELEASE_BASE: &str = "https://github.com/yc-duan/fastctx/releases/download";
+const GITHUB_LATEST_URL: &str = "https://github.com/PennixRv/fastctx/releases/latest";
+const GITHUB_RELEASE_BASE: &str = "https://github.com/PennixRv/fastctx/releases/download";
 const GITHUB_RELEASE_DISTRIBUTION: &str = "github-release";
 const NPM_QUERY_TIMEOUT: Duration = Duration::from_secs(8);
 const GITHUB_TIMEOUT: Duration = Duration::from_secs(6);
@@ -1524,7 +1524,7 @@ fn parse_latest_redirect(status: u16, location: Option<&str>) -> Result<Version,
         .ok_or_else(|| transient("GitHub latest-release redirect omitted its Location header"))?;
     let url = Url::parse(location)
         .map_err(|error| transient(format!("GitHub returned an invalid redirect URL: {error}")))?;
-    const TAG_PREFIX: &str = "/yc-duan/fastctx/releases/tag/";
+    const TAG_PREFIX: &str = "/PennixRv/fastctx/releases/tag/";
     if url.scheme() != "https"
         || url.host_str() != Some("github.com")
         || url.query().is_some()
@@ -1534,7 +1534,7 @@ fn parse_latest_redirect(status: u16, location: Option<&str>) -> Result<Version,
         || !url.path().starts_with(TAG_PREFIX)
     {
         return Err(transient(
-            "GitHub latest-release redirect pointed outside yc-duan/fastctx",
+            "GitHub latest-release redirect pointed outside PennixRv/fastctx",
         ));
     }
     let tag = &url.path()[TAG_PREFIX.len()..];

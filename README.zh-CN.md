@@ -1,4 +1,4 @@
-# FastCtx
+# FastCtx — Pennix fork
 
 [English](./README.md) | **简体中文**
 
@@ -12,12 +12,7 @@ FastCtx 是一个纯本地的 Rust 工具运行时，通过 MCP 提供文件读�
 
 MCP 会话只由宿主结束，不会因为共享运行时出问题而中断。控制中心不可达时，代理会把无法完成的调用逐条显式报错，再连上一个替代引擎（新拉起一个，或直接在代理自己进程内运行），并在同一条 stdio 通道上继续工作；有副作用的调用绝不重放。控制中心自身则在用过它的宿主进程还活着时一直驻留，等最后一个宿主退出、且没有连接、没有在执行的请求、没有运行中的后台任务之后，再过十分钟退出。
 
-```console
-npm install --global fastctx
-fastctx
-```
-
-`fastctx` 命令会打开控制终端。检查变更后选择 **接入 Codex**，再启动新的 ChatGPT / Codex 会话即可使用。
+本 Pennix fork 只通过 [`PennixRv/fastctx`](https://github.com/PennixRv/fastctx) 的 GitHub Release 分发。请使用 `pennix-fastctx-setup` Skill 下载已校验的平台归档、预览 Codex 变更并显式应用。
 
 当前优先支持 ChatGPT App 与 Codex CLI。任何 MCP client 也可以直接注册 `fastctx serve`。
 
@@ -41,14 +36,9 @@ FastCtx 将常见仓库操作整理成结构化输入输出。模型提供路径
 
 ## 安装
 
-### 使用 npm 安装
+### 使用 Pennix setup Skill 安装
 
-需要 Node.js 18 或更高版本：
-
-```console
-npm install --global fastctx
-fastctx
-```
+支持的路径是 `pennix-fastctx-setup`：它会获取固定 GitHub Release 资产、校验 `SHA256SUMS`，再通过 preview 和明确确认执行 `fastctx apply --guidance none`。本 fork 不会发布、安装或更新上游 `fastctx` npm 包。
 
 首次启动会进入全屏控制终端。界面支持 17 种语言，主要操作包括：
 
@@ -60,53 +50,29 @@ fastctx
 6. 经过确认后把全部用户偏好恢复到出厂默认；
 7. 在接入页面检查宿主配置变更，确认接入并重启 ChatGPT / Codex 会话。
 
-接入会把当前二进制复制到 `~/.fastctx/bin/`，并让宿主配置指向这个稳定路径。清理或升级 npm 缓存后，已经接入的配置仍然有效。
+接入会把已校验的 release 二进制复制到 `~/.fastctx/bin/`，并让宿主配置指向这个稳定路径。
 
-启动时，FastCtx 会先按本次启动来源检查更新，然后才进入主菜单。检查期间显示一个简短的检查画面，等待时间有严格上限：若检查无法完成——离线、超时、限流——FastCtx 会静默进入，独立的 **更新** 界面随时提供手动检查。检测到可安装的新版本时，会直接打开更新界面询问：**更新并重启**，或 **继续使用** 当前版本。成功结果会在 `~/.fastctx` 之外的机器级私有存储中缓存 24 小时，因此多数启动完全不触网。npm 启动会针对实际 launcher 包，使用全新的独立缓存和 `--prefer-online` 查询；直接下载的 GitHub Release 程序会从 GitHub 的 `releases/latest` 网页重定向读取稳定 tag。
-
-如果 GitHub 已发布新版本、但 npm 暂时还没有显示对应版本，FastCtx 会明确进入“等待 npm 同步”界面，而不是相信陈旧结果。每次 **重试** 都会再建一个独立缓存，不清理、也不修改用户原有 npm 缓存。网络、限流等瞬态失败保持安静，并记录在 **状态** 页面；发布元数据结构异常只警告一次。状态页面也提供绕过 24 小时缓存的手动检查。确认 npm 更新后只安装精确版本，并禁用生命周期脚本。GitHub Release 更新会下载本仓库对应平台的归档与汇总 `SHA256SUMS`，先校验归档，再安全解出二进制、执行版本探测并原子替换；重启健康检查失败会回滚。npm 更新失败会精确恢复先前包版本；任何更新事务失败都会重新打开旧版 TUI 并显示警告。更新成功后，由 FastCtx 拥有的 `~/.fastctx/bin/` 副本会同步更新，外部改写过的副本保持不动。
+GitHub Release 二进制会从 `PennixRv/fastctx` 检查新版本。确认更新后会下载固定平台归档与汇总 `SHA256SUMS`，先校验归档，再安全解出二进制、探测版本并原子替换；重启健康检查失败会回滚。
 
 `cargo install` 构建和内部 `~/.fastctx/bin/` runtime 不会自行更新。可设置 `FASTCTX_DISABLE_UPDATE_CHECK=1` 关闭 TUI 启动检查。
 
 **移除** 会终止从受管 bin 目录运行的 FastCtx 进程镜像，撤销 FastCtx 管理的配置并删除受管数据。用户在接入之后修改的共享设置会保留。
 
-### 安装遇到 404
-
-镜像源同步官方源的新版本有延迟。新版本刚发布时，走镜像安装可能返回 `404 Not Found`——最常见的是平台二进制包：npm 把它作为可选依赖安装，失败时会静默跳过，于是 `fastctx` 装上了却起不来。
-
-只让这一次安装走官方源：
-
-```console
-npm install --global fastctx --registry=https://registry.npmjs.org/
-```
-
-`--registry` 只作用于当前这条命令，不改动 npm 配置。如果希望长期使用官方源：
-
-```console
-npm config set registry https://registry.npmjs.org/ --location=user
-```
-
-装好之后，**更新** 界面会分别探测本机 npm 配置的源、官方源与 registry.npmmirror.com，并从第一个同时具备 launcher 和对应平台包的源安装。版本号始终以官方源与 GitHub 为准，镜像不会让 FastCtx 认为存在官方尚未发布的版本。
-
-### 一次性运行
-
-```console
-npx fastctx
-```
-
-`npx` 无需全局安装即可打开同一个控制终端。接入仍会把二进制复制到 `~/.fastctx/bin/`，npx 缓存被清理后已接入的配置依旧有效；只有 `fastctx` 命令本身需要全局安装。
-
 ### 非交互使用
 
 ```console
-fastctx apply --tier standard --yes
+fastctx apply --tier standard --guidance none --yes
+fastctx guidance status
+fastctx guidance apply --yes
+fastctx guidance remove --yes
 fastctx status
 fastctx jobs
 fastctx jobs kill j-a1b2c3
 fastctx unapply --yes
 ```
 
-- `apply`：安装并写入配置；
+- `apply`：安装并写入 MCP 配置；默认 `managed` guidance 模式兼容上游，`--guidance none` 不触碰 `AGENTS.md`；
+- `guidance`：预览后只检查、写入或删除 receipt 所有的 FastCtx marker；
 - `status`：检查配置、二进制和 MCP 握手；
 - `jobs`：列出运行中的后台任务；
 - `jobs kill <job_id>`：终止指定后台任务及其完整进程树；
@@ -141,9 +107,7 @@ max_file_size_mib = 512
 
 ### 其他分发方式
 
-```console
-cargo install fastctx --locked
-```
+可使用 `cargo build --release` 构建不受管的本地二进制；它不参与 Pennix 更新或 setup 流程。
 
 GitHub Releases 为 Windows x64 与 Windows arm64 提供 zip，为 Linux x64、macOS x64 和 macOS arm64 提供保留执行位的 tar.gz。每个归档都包含二进制与许可声明，并由 Release 的汇总 `SHA256SUMS` 校验。
 
@@ -385,7 +349,7 @@ FastCtx MCP server 继承宿主进程的本地权限。
 | `inspect_local_file` / `grep` / `glob` | 开启 | 宿主进程有权读取的本地文件 |
 | `replace` | 开启 | 本地文件写入，带 dry-run、CAS 和原子替换保护 |
 | Bash 工具 | 关闭 | 用户启用后可执行 Bash 命令 |
-| TUI 更新检查 | npm 与 GitHub Release 启动时开启 | 从 `registry.npmjs.org` 与 GitHub 的 `releases/latest` 网页重定向获取版本元数据；下载必须由用户确认 |
+| TUI 更新检查 | GitHub Release 启动时开启 | 从 `PennixRv/fastctx` 的 `releases/latest` 网页重定向获取版本元数据；下载必须由用户确认 |
 | MCP runtime 网络请求 | 无 | `serve` 与工具调用不产生遥测或更新流量 |
 
 启动检查只会发送 FastCtx 版本、常规 HTTPS 请求元数据，以及 npm 的标准仓库请求；不会发送仓库路径、任务数据或文件内容。后台任务的命令、工作目录、输出与退出状态只保存在当前用户的私有目录 `~/.fastctx/jobs/` 中；当前格式任务使用完整纯文本日志。FastCtx 不会上传这些数据。Bash 命令仍可按照命令本身访问网络。预构建版本已经内嵌 PDF 引擎。
@@ -411,7 +375,7 @@ FastCtx 使用或管理以下内容：
 - `~/.fastctx/jobs/`：由 `run_background` 按需创建的持久后台任务记录与当前格式完整输出日志；
 - `~/.codex/config.toml` 中的 `[mcp_servers.fastctx]`，其中包括 `tool_timeout_sec = 300`；
 - `direct_only_tool_namespaces` 中的 `mcp__fastctx` 元素；
-- `~/.codex/AGENTS.md` 中带边界标记的 FastCtx 段；
+- 仅在显式管理 guidance 时，才写入 `~/.codex/AGENTS.md` 中带边界标记的 FastCtx 段；
 - 用户确认后的 `tool_output_token_limit` 档位值。
 
 FastCtx 使用 `toml_edit` 修改已有 TOML，保留注释、格式和其他配置。移除按写入所有权逐项撤销，用户后续改动会保留；删除 `~/.fastctx/` 前会先终止所有运行中的后台任务。
@@ -424,9 +388,9 @@ FastCtx 采用 Apache License 2.0。
 
 内嵌 Pdfium 的第三方许可见 [`THIRD_PARTY_LICENSES.md`](./THIRD_PARTY_LICENSES.md)。
 
-## 联系方式
+## 分发说明
 
-FastCtx 由 [yc-duan](https://github.com/yc-duan) 创建和维护。集成、再分发、合作或任何其他事宜，欢迎联系：dy2958830371@gmail.com。
+`PennixRv/fastctx` 是 [yc-duan/fastctx](https://github.com/yc-duan/fastctx) 的 Pennix 维护 fork。Pennix 变更只由本仓库分发，不表示得到上游认可。
 
 ## 致谢
 

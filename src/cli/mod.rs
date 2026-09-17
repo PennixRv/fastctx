@@ -1,7 +1,8 @@
 //! Command-line parsing, dual-mode TTY dispatch, and non-interactive control commands.
 
 use crate::control::apply::{
-    ApplyOptions, UnapplyOptions, commit_apply, commit_unapply, plan_apply, plan_unapply,
+    ApplyOptions, GuidanceMode, GuidancePlan, UnapplyOptions, commit_apply, commit_guidance,
+    commit_unapply, plan_apply, plan_guidance_apply, plan_guidance_remove, plan_unapply,
 };
 use crate::control::doctor;
 use crate::control::i18n::{ALL_LANGUAGES, Language};
@@ -49,6 +50,9 @@ enum Command {
         /// Host output tier; defaults to the saved selection.
         #[arg(long, value_enum)]
         tier: Option<Tier>,
+        /// Whether FastCtx manages its marker block in AGENTS.md.
+        #[arg(long, value_enum, default_value_t = GuidanceMode::Managed)]
+        guidance: GuidanceMode,
         /// Accept the preview and any shared-limit conflict.
         #[arg(long)]
         yes: bool,
@@ -61,6 +65,11 @@ enum Command {
         /// Accept the preview without prompting.
         #[arg(long)]
         yes: bool,
+    },
+    /// Inspect or explicitly manage only the FastCtx AGENTS guidance block.
+    Guidance {
+        #[command(subcommand)]
+        command: GuidanceCommand,
     },
     /// Run all local integration checks.
     #[command(visible_alias = "doctor")]
@@ -123,6 +132,35 @@ enum JobsCommand {
     },
 }
 
+/// Scriptable FastCtx guidance operations.
+#[derive(Debug, Subcommand)]
+enum GuidanceCommand {
+    /// Report the FastCtx guidance state without changing files.
+    Status {
+        /// Codex profile directory; overrides CODEX_HOME and the default.
+        #[arg(long, value_name = "PATH")]
+        codex_home: Option<PathBuf>,
+    },
+    /// Preview and add or refresh only the FastCtx guidance block.
+    Apply {
+        /// Codex profile directory; overrides CODEX_HOME and the default.
+        #[arg(long, value_name = "PATH")]
+        codex_home: Option<PathBuf>,
+        /// Accept the preview without prompting.
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Preview and remove only the receipt-owned FastCtx guidance block.
+    Remove {
+        /// Codex profile directory; overrides CODEX_HOME and the default.
+        #[arg(long, value_name = "PATH")]
+        codex_home: Option<PathBuf>,
+        /// Accept the preview without prompting.
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
 /// Parses the current process arguments and executes the selected command.
 pub async fn run() -> Result<ExitCode, String> {
     if let Some(request) = std::env::var_os(crate::update::UPDATE_FINALIZE_ENV) {
@@ -175,9 +213,11 @@ async fn run_cli(cli: Cli) -> Result<ExitCode, String> {
         Some(Command::Apply {
             codex_home,
             tier,
+            guidance,
             yes,
-        }) => run_apply(codex_home, tier, yes),
+        }) => run_apply(codex_home, tier, guidance, yes),
         Some(Command::Unapply { codex_home, yes }) => run_unapply(codex_home, yes),
+        Some(Command::Guidance { command }) => run_guidance(command),
         Some(Command::Status { codex_home }) => run_status(codex_home),
         Some(Command::Lang { code }) => run_lang(&code),
         Some(Command::Jobs { command }) => run_jobs(command),
@@ -345,6 +385,7 @@ pub async fn run_server_with_options(options: ServerOptions) -> Result<ExitCode,
 fn run_apply(
     codex_home: Option<PathBuf>,
     tier: Option<Tier>,
+    guidance: GuidanceMode,
     yes: bool,
 ) -> Result<ExitCode, String> {
     let paths = ControlPaths::discover_with_codex_home(codex_home)?;
@@ -360,6 +401,7 @@ fn run_apply(
             tool_budgets: saved.tool_budgets,
             output_guard_enabled: saved.output_guard.enabled,
             fastshell_enabled: saved.fastshell.enabled,
+            guidance,
             current_executable: std::env::current_exe()
                 .map_err(|error| format!("Cannot locate the running fastctx binary: {error}"))?,
         },
@@ -394,6 +436,59 @@ fn run_apply(
     }
     let receipt = commit_apply(plan, yes || io::stdin().is_terminal())?;
     print_receipt(&receipt);
+    Ok(ExitCode::SUCCESS)
+}
+
+fn run_guidance(command: GuidanceCommand) -> Result<ExitCode, String> {
+    match command {
+        GuidanceCommand::Status { codex_home } => {
+            let paths = ControlPaths::discover_with_codex_home(codex_home)?;
+            let check = doctor::guidance_check(&paths);
+            let label = match check.status {
+                doctor::DoctorCheckStatus::Pass => "PASS",
+                doctor::DoctorCheckStatus::Info => "INFO",
+                doctor::DoctorCheckStatus::Fail => "FAIL",
+            };
+            println!("[{label}] {}: {}", check.name, check.detail);
+            if let Some(remedy) = check.remedy {
+                println!("       Next: {remedy}");
+            }
+            Ok(if check.status == doctor::DoctorCheckStatus::Fail {
+                ExitCode::FAILURE
+            } else {
+                ExitCode::SUCCESS
+            })
+        }
+        GuidanceCommand::Apply { codex_home, yes } => {
+            let paths = ControlPaths::discover_with_codex_home(codex_home)?;
+            run_guidance_change("Guidance apply preview", plan_guidance_apply(&paths)?, yes)
+        }
+        GuidanceCommand::Remove { codex_home, yes } => {
+            let paths = ControlPaths::discover_with_codex_home(codex_home)?;
+            run_guidance_change(
+                "Guidance remove preview",
+                plan_guidance_remove(&paths)?,
+                yes,
+            )
+        }
+    }
+}
+
+fn run_guidance_change(title: &str, plan: GuidancePlan, yes: bool) -> Result<ExitCode, String> {
+    print_preview(title, plan.preview());
+    if !yes && !plan.is_empty() {
+        if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+            return Err(
+                "Guidance changes require confirmation in a terminal. Re-run with --yes after reviewing the preview."
+                    .to_string(),
+            );
+        }
+        if !confirm("Apply these guidance changes?")? {
+            println!("Cancelled. No files were written.");
+            return Ok(ExitCode::SUCCESS);
+        }
+    }
+    print_receipt(&commit_guidance(plan)?);
     Ok(ExitCode::SUCCESS)
 }
 

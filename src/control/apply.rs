@@ -9,6 +9,7 @@ use crate::control::settings::{
     self, AppliedRecord, ManagedFileRecord, Tier, ToolBudgetPreferences,
 };
 use crate::control::transaction::{self, FileAction, FileChange};
+use clap::ValueEnum;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -26,8 +27,19 @@ pub struct ApplyOptions {
     pub output_guard_enabled: bool,
     /// Whether the optional shell tool group should be published.
     pub fastshell_enabled: bool,
+    /// Whether this Apply also manages the FastCtx-owned AGENTS guidance block.
+    pub guidance: GuidanceMode,
     /// Currently running binary to self-install.
     pub current_executable: PathBuf,
+}
+
+/// How Apply handles the FastCtx-owned guidance block.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum GuidanceMode {
+    /// Keep the existing default: manage the FastCtx marker in AGENTS.md.
+    Managed,
+    /// Configure FastCtx without reading or changing AGENTS.md.
+    None,
 }
 
 /// User choices for Unapply. Unapply is a complete removal with no options: the token key
@@ -162,6 +174,25 @@ pub struct UnapplyPlan {
     running_processes: Vec<InstalledProcess>,
 }
 
+/// Immutable standalone guidance ChangeSet shared by preview and commit.
+#[derive(Clone, Debug)]
+pub struct GuidancePlan {
+    changes: Vec<FileChange>,
+    preview: Vec<PreviewItem>,
+}
+
+impl GuidancePlan {
+    /// Returns every effective change.
+    pub fn preview(&self) -> &[PreviewItem] {
+        &self.preview
+    }
+
+    /// Whether no file would change.
+    pub fn is_empty(&self) -> bool {
+        self.changes.iter().all(|change| !change.is_changed())
+    }
+}
+
 impl UnapplyPlan {
     /// Returns every effective change.
     pub fn preview(&self) -> &[PreviewItem] {
@@ -281,6 +312,9 @@ pub(crate) fn synchronize_applied_guidance(
     let Some(record) = settings.applied.as_ref() else {
         return Ok(AppliedGuidanceSync::NotApplied);
     };
+    if record.codex_agents.is_none() {
+        return Ok(AppliedGuidanceSync::Current);
+    }
     if !record.targets_codex_profile(paths) {
         return Err(receipt_profile_mismatch(paths, record));
     }
@@ -366,13 +400,6 @@ pub fn plan_apply(paths: &ControlPaths, options: ApplyOptions) -> Result<ApplyPl
     };
     let codex_edit = codex_config::apply(codex_source, &expected)?;
 
-    let agents_original = transaction::read_snapshot(&paths.codex_agents)?;
-    let agents_edit = agents::apply_section_with_ownership_for(
-        agents_original.as_deref().unwrap_or_default(),
-        options.fastshell_enabled,
-    )?;
-    let agents_bytes = agents_edit.bytes;
-
     let installed_original = if same_path(&options.current_executable, &paths.installed_binary) {
         Some(source_binary.clone())
     } else {
@@ -398,21 +425,40 @@ pub fn plan_apply(paths: &ControlPaths, options: ApplyOptions) -> Result<ApplyPl
         .applied
         .clone()
         .filter(|record| record.targets_codex_profile(paths));
+    let guidance = if options.guidance == GuidanceMode::Managed {
+        let original = transaction::read_snapshot(&paths.codex_agents)?;
+        let edit = agents::apply_section_with_ownership_for(
+            original.as_deref().unwrap_or_default(),
+            options.fastshell_enabled,
+        )?;
+        Some((original, edit))
+    } else {
+        None
+    };
     let codex_dir_created = previous_applied
         .as_ref()
         .map(|record| record.codex_dir_created || codex_dir_missing)
         .unwrap_or(codex_dir_missing);
-    let agents_inserted_separator = previous_applied
-        .as_ref()
-        .filter(|record| {
-            agents_original
-                .as_deref()
-                .is_some_and(|bytes| record.codex_agents.applied_sha256 == sha256(bytes))
-        })
-        .and_then(|record| record.codex_agents_inserted_separator)
-        .or(agents_edit.inserted_separator);
+    let agents_inserted_separator = guidance.as_ref().and_then(|(original, edit)| {
+        previous_applied
+            .as_ref()
+            .and_then(|record| record.codex_agents.as_ref())
+            .filter(|record| {
+                original
+                    .as_deref()
+                    .is_some_and(|bytes| record.applied_sha256 == sha256(bytes))
+            })
+            .and_then(|_| {
+                previous_applied
+                    .as_ref()
+                    .and_then(|record| record.codex_agents_inserted_separator)
+            })
+            .or(edit.inserted_separator)
+    });
     let managed_unchanged = codex_original.as_deref() == Some(codex_edit.bytes.as_slice())
-        && agents_original.as_deref() == Some(agents_bytes.as_slice())
+        && guidance
+            .as_ref()
+            .is_none_or(|(original, edit)| original.as_deref() == Some(edit.bytes.as_slice()))
         && installed_original.as_deref() == Some(source_binary.as_slice());
     let record_current = previous_applied.as_ref().is_some_and(|record| {
         record_matches(
@@ -421,7 +467,7 @@ pub fn plan_apply(paths: &ControlPaths, options: ApplyOptions) -> Result<ApplyPl
                 expected: &expected,
                 paths,
                 binary_hash: &binary_hash,
-                agents_bytes: &agents_bytes,
+                agents_bytes: guidance.as_ref().map(|(_, edit)| edit.bytes.as_slice()),
                 agents_inserted_separator,
                 codex_dir_created,
             },
@@ -457,6 +503,33 @@ pub fn plan_apply(paths: &ControlPaths, options: ApplyOptions) -> Result<ApplyPl
                 codex_edit.previous_token_limit_present,
                 codex_edit.previous_token_limit,
             ));
+        let (codex_agents, agents_contract_id, codex_agents_inserted_separator) =
+            if let Some((agents_original, agents_edit)) = guidance.as_ref() {
+                (
+                    Some(managed_record(
+                        &paths.codex_agents,
+                        agents_original,
+                        &agents_edit.bytes,
+                        previous_applied
+                            .as_ref()
+                            .and_then(|record| record.codex_agents.as_ref()),
+                    )),
+                    Some(agents::MANAGED_SECTION_CONTRACT_ID.to_string()),
+                    agents_inserted_separator,
+                )
+            } else {
+                (
+                    previous_applied
+                        .as_ref()
+                        .and_then(|record| record.codex_agents.clone()),
+                    previous_applied
+                        .as_ref()
+                        .and_then(|record| record.agents_contract_id.clone()),
+                    previous_applied
+                        .as_ref()
+                        .and_then(|record| record.codex_agents_inserted_separator),
+                )
+            };
         current_settings.applied = Some(AppliedRecord {
             applied_at_utc: timestamp.clone(),
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -477,20 +550,15 @@ pub fn plan_apply(paths: &ControlPaths, options: ApplyOptions) -> Result<ApplyPl
                 &codex_edit.bytes,
                 previous_applied.as_ref().map(|record| &record.codex_config),
             ),
-            codex_agents: managed_record(
-                &paths.codex_agents,
-                &agents_original,
-                &agents_bytes,
-                previous_applied.as_ref().map(|record| &record.codex_agents),
-            ),
-            agents_contract_id: Some(agents::MANAGED_SECTION_CONTRACT_ID.to_string()),
-            codex_agents_inserted_separator: agents_inserted_separator,
+            codex_agents,
+            agents_contract_id,
+            codex_agents_inserted_separator,
             binary_sha256: binary_hash,
         });
         settings::encode(&current_settings)?
     };
 
-    let changes = vec![
+    let mut changes = vec![
         file_write(
             paths.installed_binary.clone(),
             installed_original,
@@ -505,21 +573,23 @@ pub fn plan_apply(paths: &ControlPaths, options: ApplyOptions) -> Result<ApplyPl
             transaction::existing_unix_mode(&paths.codex_config).or(Some(0o600)),
             false,
         ),
-        file_write(
+    ];
+    if let Some((agents_original, agents_edit)) = guidance {
+        changes.push(file_write(
             paths.codex_agents.clone(),
             agents_original,
-            agents_bytes,
+            agents_edit.bytes,
             transaction::existing_unix_mode(&paths.codex_agents).or(Some(0o600)),
             false,
-        ),
-        file_write(
-            paths.fastctx_config.clone(),
-            settings_original,
-            settings_bytes,
-            transaction::existing_unix_mode(&paths.fastctx_config).or(Some(0o600)),
-            false,
-        ),
-    ];
+        ));
+    }
+    changes.push(file_write(
+        paths.fastctx_config.clone(),
+        settings_original,
+        settings_bytes,
+        transaction::existing_unix_mode(&paths.fastctx_config).or(Some(0o600)),
+        false,
+    ));
     let stale_binaries = find_stale_binaries(paths, &options.current_executable)?;
     let mut preview = preview_apply(
         &changes,
@@ -582,6 +652,192 @@ pub fn commit_apply(
     })
 }
 
+/// Computes an immutable plan that adds or refreshes only FastCtx-owned guidance.
+pub fn plan_guidance_apply(paths: &ControlPaths) -> Result<GuidancePlan, String> {
+    let settings_original = transaction::read_snapshot(&paths.fastctx_config)?;
+    let mut current_settings = settings::load(paths)?;
+    let (fastshell_enabled, previous_guidance) = applied_guidance_state(paths, &current_settings)?;
+    let agents_original = transaction::read_snapshot(&paths.codex_agents)?;
+    let state = agents_original
+        .as_deref()
+        .map_or(agents::ManagedSectionState::Missing, |bytes| {
+            agents::classify_managed_section(bytes, fastshell_enabled)
+        });
+    match (&previous_guidance, &state) {
+        (None, agents::ManagedSectionState::Missing)
+        | (Some(_), agents::ManagedSectionState::Current)
+        | (Some(_), agents::ManagedSectionState::KnownLegacy)
+        | (Some(_), agents::ManagedSectionState::Missing) => {}
+        (None, _) => {
+            return Err("AGENTS.md already contains a FastCtx marker that this receipt does not own; refuse to replace it.".to_string());
+        }
+        (
+            Some(_),
+            agents::ManagedSectionState::Drifted | agents::ManagedSectionState::Malformed(_),
+        ) => {
+            return Err("FastCtx guidance is no longer an exact managed block; review AGENTS.md before applying guidance.".to_string());
+        }
+    }
+    let edit = agents::apply_section_with_ownership_for(
+        agents_original.as_deref().unwrap_or_default(),
+        fastshell_enabled,
+    )?;
+    let inserted_separator = previous_guidance
+        .as_ref()
+        .filter(|record| {
+            agents_original
+                .as_deref()
+                .is_some_and(|bytes| record.applied_sha256 == sha256(bytes))
+        })
+        .and_then(|_| {
+            current_settings
+                .applied
+                .as_ref()
+                .and_then(|record| record.codex_agents_inserted_separator)
+        })
+        .or(edit.inserted_separator);
+    let applied = current_settings
+        .applied
+        .as_mut()
+        .expect("applied_guidance_state requires an Apply receipt");
+    applied.codex_agents = Some(managed_record(
+        &paths.codex_agents,
+        &agents_original,
+        &edit.bytes,
+        previous_guidance.as_ref(),
+    ));
+    applied.agents_contract_id = Some(agents::MANAGED_SECTION_CONTRACT_ID.to_string());
+    applied.codex_agents_inserted_separator = inserted_separator;
+    let settings_bytes = settings::encode(&current_settings)?;
+    let changes = vec![
+        file_write(
+            paths.codex_agents.clone(),
+            agents_original,
+            edit.bytes,
+            transaction::existing_unix_mode(&paths.codex_agents).or(Some(0o600)),
+            false,
+        ),
+        file_write(
+            paths.fastctx_config.clone(),
+            settings_original,
+            settings_bytes,
+            transaction::existing_unix_mode(&paths.fastctx_config).or(Some(0o600)),
+            false,
+        ),
+    ];
+    Ok(GuidancePlan {
+        preview: preview_guidance(&changes, false),
+        changes,
+    })
+}
+
+/// Computes an immutable plan that removes only the receipt-owned FastCtx guidance.
+pub fn plan_guidance_remove(paths: &ControlPaths) -> Result<GuidancePlan, String> {
+    let settings_original = transaction::read_snapshot(&paths.fastctx_config)?;
+    let mut current_settings = settings::load(paths)?;
+    let (fastshell_enabled, previous_guidance) = applied_guidance_state(paths, &current_settings)?;
+    let Some(previous_guidance) = previous_guidance else {
+        return Ok(GuidancePlan {
+            changes: Vec::new(),
+            preview: Vec::new(),
+        });
+    };
+    let agents_original = transaction::read_snapshot(&paths.codex_agents)?;
+    let state = agents_original
+        .as_deref()
+        .map_or(agents::ManagedSectionState::Missing, |bytes| {
+            agents::classify_managed_section(bytes, fastshell_enabled)
+        });
+    let agents_change = match state {
+        agents::ManagedSectionState::Current | agents::ManagedSectionState::KnownLegacy => {
+            let inserted_separator = agents_original
+                .as_deref()
+                .filter(|bytes| previous_guidance.applied_sha256 == sha256(bytes))
+                .and_then(|_| {
+                    current_settings
+                        .applied
+                        .as_ref()
+                        .and_then(|record| record.codex_agents_inserted_separator)
+                });
+            let bytes = agents::remove_applied_section(
+                agents_original.as_deref().unwrap_or_default(),
+                inserted_separator,
+            )?;
+            let action = if bytes.is_empty() && !previous_guidance.original_existed {
+                FileAction::Delete
+            } else {
+                FileAction::Write(bytes)
+            };
+            Some(FileChange {
+                target: paths.codex_agents.clone(),
+                original: agents_original,
+                action,
+                unix_mode: transaction::existing_unix_mode(&paths.codex_agents).or(Some(0o600)),
+                locked_binary_fallback: false,
+            })
+        }
+        agents::ManagedSectionState::Missing => None,
+        agents::ManagedSectionState::Drifted | agents::ManagedSectionState::Malformed(_) => {
+            return Err("FastCtx guidance is no longer an exact managed block; review AGENTS.md before removing guidance.".to_string());
+        }
+    };
+    let applied = current_settings
+        .applied
+        .as_mut()
+        .expect("applied_guidance_state requires an Apply receipt");
+    applied.codex_agents = None;
+    applied.agents_contract_id = None;
+    applied.codex_agents_inserted_separator = None;
+    let settings_bytes = settings::encode(&current_settings)?;
+    let mut changes = Vec::new();
+    if let Some(agents_change) = agents_change {
+        changes.push(agents_change);
+    }
+    changes.push(file_write(
+        paths.fastctx_config.clone(),
+        settings_original,
+        settings_bytes,
+        transaction::existing_unix_mode(&paths.fastctx_config).or(Some(0o600)),
+        false,
+    ));
+    Ok(GuidancePlan {
+        preview: preview_guidance(&changes, true),
+        changes,
+    })
+}
+
+/// Commits a standalone guidance plan without recomputing file contents after preview.
+pub fn commit_guidance(plan: GuidancePlan) -> Result<OperationReceipt, String> {
+    let changed_targets = plan
+        .changes
+        .iter()
+        .filter(|change| change.is_changed())
+        .count();
+    transaction::commit(&plan.changes)?;
+    Ok(OperationReceipt {
+        changed_targets,
+        notes: if changed_targets == 0 {
+            vec!["No changes were needed.".to_string()]
+        } else {
+            vec!["Changes apply to newly started ChatGPT/Codex sessions.".to_string()]
+        },
+    })
+}
+
+fn applied_guidance_state(
+    paths: &ControlPaths,
+    settings: &settings::FastCtxSettings,
+) -> Result<(bool, Option<ManagedFileRecord>), String> {
+    let record = settings
+        .applied
+        .as_ref()
+        .ok_or_else(|| "Run fastctx apply before managing guidance.".to_string())?;
+    if !record.targets_codex_profile(paths) {
+        return Err(receipt_profile_mismatch(paths, record));
+    }
+    Ok((record.fastshell_enabled, record.codex_agents.clone()))
+}
+
 /// Computes the complete immutable Unapply plan.
 pub fn plan_unapply(paths: &ControlPaths, options: UnapplyOptions) -> Result<UnapplyPlan, String> {
     let running_jobs = crate::shell::jobs::running_summaries(paths)?.len();
@@ -630,30 +886,54 @@ pub fn plan_unapply(paths: &ControlPaths, options: UnapplyOptions) -> Result<Una
         FileAction::Write(codex_bytes)
     };
 
-    let agents_original = transaction::read_snapshot(&paths.codex_agents)?;
-    let agents_inserted_separator = applied
+    let agents_change = if let Some(agents_record) = applied
         .as_ref()
-        .filter(|record| {
-            agents_original
-                .as_deref()
-                .is_some_and(|bytes| record.codex_agents.applied_sha256 == sha256(bytes))
-        })
-        .and_then(|record| record.codex_agents_inserted_separator);
-    let agents_bytes = agents::remove_applied_section(
-        agents_original.as_deref().unwrap_or_default(),
-        agents_inserted_separator,
-    )?;
-    // Delete a now-empty file only when Apply originally created it; otherwise write back the remaining content.
-    let agents_original_existed = applied
-        .as_ref()
-        .map(|record| record.codex_agents.original_existed)
-        .unwrap_or_else(|| agents_original.is_some());
-    let agents_action =
-        if agents_original.is_none() || (agents_bytes.is_empty() && !agents_original_existed) {
-            FileAction::Delete
-        } else {
-            FileAction::Write(agents_bytes)
-        };
+        .and_then(|record| record.codex_agents.as_ref())
+    {
+        let original = transaction::read_snapshot(&paths.codex_agents)?;
+        let state = original
+            .as_deref()
+            .map_or(agents::ManagedSectionState::Missing, |bytes| {
+                agents::classify_managed_section(
+                    bytes,
+                    applied.as_ref().expect("receipt exists").fastshell_enabled,
+                )
+            });
+        match state {
+            agents::ManagedSectionState::Current | agents::ManagedSectionState::KnownLegacy => {
+                let inserted_separator = original
+                    .as_deref()
+                    .filter(|bytes| agents_record.applied_sha256 == sha256(bytes))
+                    .and_then(|_| {
+                        applied
+                            .as_ref()
+                            .and_then(|record| record.codex_agents_inserted_separator)
+                    });
+                let bytes = agents::remove_applied_section(
+                    original.as_deref().unwrap_or_default(),
+                    inserted_separator,
+                )?;
+                let action = if bytes.is_empty() && !agents_record.original_existed {
+                    FileAction::Delete
+                } else {
+                    FileAction::Write(bytes)
+                };
+                Some(FileChange {
+                    target: paths.codex_agents.clone(),
+                    original,
+                    action,
+                    unix_mode: transaction::existing_unix_mode(&paths.codex_agents).or(Some(0o600)),
+                    locked_binary_fallback: false,
+                })
+            }
+            agents::ManagedSectionState::Missing => None,
+            agents::ManagedSectionState::Drifted | agents::ManagedSectionState::Malformed(_) => {
+                return Err("FastCtx guidance is no longer an exact managed block; review AGENTS.md before running unapply.".to_string());
+            }
+        }
+    } else {
+        None
+    };
 
     let installed_original = transaction::read_snapshot(&paths.installed_binary)?;
     let running_installed =
@@ -675,13 +955,6 @@ pub fn plan_unapply(paths: &ControlPaths, options: UnapplyOptions) -> Result<Una
             locked_binary_fallback: false,
         },
         FileChange {
-            target: paths.codex_agents.clone(),
-            original: agents_original,
-            action: agents_action,
-            unix_mode: transaction::existing_unix_mode(&paths.codex_agents).or(Some(0o600)),
-            locked_binary_fallback: false,
-        },
-        FileChange {
             target: paths.fastctx_config.clone(),
             original: settings_original,
             action: settings_action,
@@ -689,6 +962,9 @@ pub fn plan_unapply(paths: &ControlPaths, options: UnapplyOptions) -> Result<Una
             locked_binary_fallback: false,
         },
     ];
+    if let Some(agents_change) = agents_change {
+        changes.insert(1, agents_change);
+    }
     if !running_installed {
         changes.push(FileChange {
             target: paths.installed_binary.clone(),
@@ -976,7 +1252,7 @@ struct RecordMatchContext<'a> {
     expected: &'a ExpectedConfig,
     paths: &'a ControlPaths,
     binary_hash: &'a str,
-    agents_bytes: &'a [u8],
+    agents_bytes: Option<&'a [u8]>,
     agents_inserted_separator: Option<agents::InsertedSeparator>,
     codex_dir_created: bool,
 }
@@ -1001,11 +1277,17 @@ fn record_matches(record: &AppliedRecord, context: &RecordMatchContext<'_>) -> b
         && record.fastctx_token_budget == expected.fastctx_budget
         && record.codex_dir_created == *codex_dir_created
         && record.codex_config.path == crate::paths::display_path(&paths.codex_config)
-        && record.codex_agents.path == crate::paths::display_path(&paths.codex_agents)
+        && agents_bytes.is_none_or(|agents_bytes| {
+            record.codex_agents.as_ref().is_some_and(|codex_agents| {
+                codex_agents.path == crate::paths::display_path(&paths.codex_agents)
+                    && codex_agents.applied_sha256 == sha256(agents_bytes)
+            })
+        })
         && record.binary_sha256 == *binary_hash
-        && record.codex_agents.applied_sha256 == sha256(agents_bytes)
-        && record.agents_contract_id.as_deref() == Some(agents::MANAGED_SECTION_CONTRACT_ID)
-        && record.codex_agents_inserted_separator == *agents_inserted_separator
+        && agents_bytes.is_none_or(|_| {
+            record.agents_contract_id.as_deref() == Some(agents::MANAGED_SECTION_CONTRACT_ID)
+                && record.codex_agents_inserted_separator == *agents_inserted_separator
+        })
 }
 
 fn codex_directory_will_be_created(paths: &ControlPaths) -> Result<bool, String> {
@@ -1252,6 +1534,47 @@ fn preview_apply(
                 action,
                 target: preview_target(change),
                 details,
+            }
+        })
+        .collect()
+}
+
+fn preview_guidance(changes: &[FileChange], removing: bool) -> Vec<PreviewItem> {
+    changes
+        .iter()
+        .map(|change| {
+            if !change.is_changed() {
+                return PreviewItem {
+                    path: change.target.clone(),
+                    action: PreviewAction::Unchanged,
+                    target: preview_target(change),
+                    details: Vec::new(),
+                };
+            }
+            if is_codex_agents(change) {
+                return PreviewItem {
+                    path: change.target.clone(),
+                    action: match change.action {
+                        FileAction::Delete => PreviewAction::Delete,
+                        FileAction::Write(_) => PreviewAction::Modify,
+                    },
+                    target: PreviewTarget::Agents,
+                    details: vec![if removing {
+                        PreviewDetail::removed("<!-- fastctx:begin --> … <!-- fastctx:end -->")
+                    } else {
+                        PreviewDetail::kept("<!-- fastctx:begin --> … <!-- fastctx:end -->")
+                    }],
+                };
+            }
+            PreviewItem {
+                path: change.target.clone(),
+                action: PreviewAction::Record,
+                target: PreviewTarget::Receipt,
+                details: vec![PreviewDetail::kept(if removing {
+                    "guidance = disabled"
+                } else {
+                    "guidance = managed"
+                })],
             }
         })
         .collect()

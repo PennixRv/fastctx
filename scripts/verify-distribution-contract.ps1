@@ -1,67 +1,6 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $cargoVersion = (Select-String -LiteralPath (Join-Path $root "Cargo.toml") -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
-$author = "yc-duan <dy2958830371@gmail.com>"
-$license = "Apache-2.0"
-$platforms = [ordered]@{
-    "fastctx-win32-x64" = "@fastctx/win32-x64"
-    "fastctx-win32-arm64" = "@fastctx/win32-arm64"
-    "fastctx-linux-x64" = "@fastctx/linux-x64"
-    "fastctx-darwin-x64" = "@fastctx/darwin-x64"
-    "fastctx-darwin-arm64" = "@fastctx/darwin-arm64"
-}
-
-function Read-Manifest([string]$Directory) {
-    Get-Content -LiteralPath (Join-Path $root "packages/$Directory/package.json") -Raw | ConvertFrom-Json
-}
-
-$main = Read-Manifest "fastctx"
-$alias = Read-Manifest "codex-fastctx"
-$allManifests = @($main, $alias)
-foreach ($entry in $platforms.GetEnumerator()) {
-    $manifest = Read-Manifest $entry.Key
-    $allManifests += $manifest
-    if ($manifest.name -ne $entry.Value) {
-        throw "Platform package $($entry.Key) must be named $($entry.Value), got $($manifest.name)"
-    }
-}
-
-foreach ($manifest in $allManifests) {
-    if ($manifest.version -ne $cargoVersion) {
-        throw "Package $($manifest.name) version $($manifest.version) does not match Cargo $cargoVersion"
-    }
-    if ($manifest.author -ne $author -or $manifest.license -ne $license) {
-        throw "Package $($manifest.name) changed the release identity or license contract"
-    }
-    if ($manifest.publishConfig.PSObject.Properties.Name -contains "provenance") {
-        throw "Package $($manifest.name) must not declare npm provenance for manual publishing"
-    }
-    if ($manifest.scripts -and ($manifest.scripts.install -or $manifest.scripts.postinstall)) {
-        throw "Install scripts are forbidden in $($manifest.name)"
-    }
-}
-
-$optionalNames = @($main.optionalDependencies.PSObject.Properties.Name | Sort-Object)
-$expectedOptionalNames = @($platforms.Values | Sort-Object)
-if ((Compare-Object -ReferenceObject $expectedOptionalNames -DifferenceObject $optionalNames).Count -ne 0) {
-    throw "fastctx optionalDependencies must be exactly the scoped platform packages that release publishes"
-}
-foreach ($name in $expectedOptionalNames) {
-    if ($main.optionalDependencies.$name -ne $cargoVersion) {
-        throw "fastctx optional dependency $name must use version $cargoVersion"
-    }
-}
-if ($alias.dependencies.fastctx -ne $cargoVersion) {
-    throw "codex-fastctx must depend on fastctx@$cargoVersion"
-}
-
-$launcher = Get-Content -LiteralPath (Join-Path $root "packages/fastctx/launcher.js") -Raw
-foreach ($name in $platforms.Values) {
-    if (-not $launcher.Contains("'$name'")) {
-        throw "npm launcher is missing scoped platform mapping $name"
-    }
-}
-
 $tracked = @(& git -C $root ls-files)
 if ($LASTEXITCODE -ne 0) {
     throw "Cannot inspect the public git tree"
@@ -96,7 +35,6 @@ foreach ($required in @(
     "verify-release-assets.ps1",
     "verify-release-identity.ps1 -TagName `$env:GITHUB_REF_NAME",
     "dist/release/*",
-    "npm-tarballs-",
     "workflow_dispatch:",
     "cargo install cargo-zigbuild --locked --version 0.23.0",
     "cargo zigbuild --locked --release --target `${{ matrix.zig_target }}",

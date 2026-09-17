@@ -228,64 +228,6 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: cargo clippy --locked --release --all-targets --all-features --target ${{ matrix.target }} -- -D warnings
 
-      - name: Set up Node.js for npm packaging
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-
-      - name: Drain test processes before packaging
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: ./scripts/drain-test-processes.ps1
-
-      - name: Build npm binary
-        run: cargo build --locked --release --target ${{ matrix.target }}
-
-      - name: Pack and verify npm installation
-        shell: pwsh
-        run: |
-          $binary = if ($IsWindows) { "fastctx.exe" } else { "fastctx" }
-          ./scripts/stage-npm-package.ps1 `
-            -Target "${{ matrix.target }}" `
-            -Binary "target/${{ matrix.target }}/release/$binary" `
-            -IncludeRootPackages
-          $version = (Select-String -LiteralPath Cargo.toml -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
-          $platform = switch ("${{ matrix.target }}") {
-            "x86_64-pc-windows-msvc" { "fastctx-win32-x64-$version.tgz" }
-            "aarch64-pc-windows-msvc" { "fastctx-win32-arm64-$version.tgz" }
-            "x86_64-unknown-linux-gnu" { "fastctx-linux-x64-$version.tgz" }
-            "x86_64-apple-darwin" { "fastctx-darwin-x64-$version.tgz" }
-            "aarch64-apple-darwin" { "fastctx-darwin-arm64-$version.tgz" }
-          }
-          ./scripts/verify-npm-install.ps1 `
-            -PlatformTarball "dist/npm/$platform" `
-            -MainTarball "dist/npm/fastctx-$version.tgz" `
-            -AliasTarball "dist/npm/codex-fastctx-$version.tgz"
-
-  package:
-    name: Package dry run
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Verify distribution contract
-        shell: pwsh
-        run: ./scripts/verify-distribution-contract.ps1
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Verify frozen v0.1.1 compatibility evidence
-        run: python3 tools/verify-v011-assets.py
-      - uses: Swatinem/rust-cache@v2
-      - name: Cache the pinned Pdfium archive
-        uses: actions/cache@v4
-        with:
-          path: .pdfium-archive-cache
-          key: pdfium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('build.rs') }}
-      - run: cargo publish --locked --dry-run
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-      - shell: pwsh
-        run: ./scripts/pack-npm-root.ps1
-
   supply-chain:
     name: Dependency policy
     runs-on: ubuntu-latest

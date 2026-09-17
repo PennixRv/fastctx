@@ -48,6 +48,9 @@ pub fn link_state(paths: &ControlPaths, applied: Option<&AppliedRecord>) -> Link
     let Some(record) = applied else {
         return LinkState::Absent;
     };
+    if record.codex_agents.is_none() {
+        return LinkState::Current;
+    }
     match fs::read(&paths.codex_agents) {
         Ok(bytes) => match agents::classify_managed_section(&bytes, record.fastshell_enabled) {
             agents::ManagedSectionState::Current

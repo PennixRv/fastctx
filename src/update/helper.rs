@@ -1320,7 +1320,7 @@ fn validate_plan(plan: &UpdatePlan) -> Result<(), String> {
             }
             validate_release_url(archive_url)?;
             validate_release_url(checksums_url)?;
-            let base = format!("https://github.com/yc-duan/fastctx/releases/download/v{target}");
+            let base = format!("https://github.com/PennixRv/fastctx/releases/download/v{target}");
             if archive_url != &format!("{base}/{archive_name}")
                 || checksums_url != &format!("{base}/SHA256SUMS")
             {
@@ -1614,9 +1614,9 @@ fn validate_release_url(value: &str) -> Result<(), String> {
         || url.host_str() != Some("github.com")
         || !url
             .path()
-            .starts_with("/yc-duan/fastctx/releases/download/")
+            .starts_with("/PennixRv/fastctx/releases/download/")
     {
-        return Err("release URL is outside yc-duan/fastctx".to_string());
+        return Err("release URL is outside PennixRv/fastctx".to_string());
     }
     Ok(())
 }
@@ -1626,7 +1626,7 @@ fn validate_download_response_url(value: &str) -> Result<(), String> {
     let allowed = match url.host_str() {
         Some("github.com") => url
             .path()
-            .starts_with("/yc-duan/fastctx/releases/download/"),
+            .starts_with("/PennixRv/fastctx/releases/download/"),
         Some("release-assets.githubusercontent.com" | "objects.githubusercontent.com") => true,
         _ => false,
     };

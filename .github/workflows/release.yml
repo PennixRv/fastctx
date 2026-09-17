@@ -312,40 +312,10 @@ jobs:
               /bin/bash /opt/glibc-smoke
           done
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-
-      - name: Pack and verify npm artifact
-        shell: pwsh
-        run: |
-          $version = (Select-String -LiteralPath Cargo.toml -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
-          $package = switch ("${{ matrix.target }}") {
-            "x86_64-pc-windows-msvc" { "fastctx-win32-x64-$version.tgz" }
-            "aarch64-pc-windows-msvc" { "fastctx-win32-arm64-$version.tgz" }
-            "x86_64-unknown-linux-gnu" { "fastctx-linux-x64-$version.tgz" }
-            "x86_64-apple-darwin" { "fastctx-darwin-x64-$version.tgz" }
-            "aarch64-apple-darwin" { "fastctx-darwin-arm64-$version.tgz" }
-          }
-          $verificationDirectory = "target/npm-release-verification"
-          ./scripts/stage-npm-package.ps1 `
-            -Target "${{ matrix.target }}" `
-            -Binary "target/${{ matrix.target }}/release/${{ matrix.binary }}" `
-            -OutputDirectory $verificationDirectory `
-            -IncludeRootPackages
-          ./scripts/verify-npm-install.ps1 `
-            -PlatformTarball "$verificationDirectory/$package" `
-            -MainTarball "$verificationDirectory/fastctx-$version.tgz" `
-            -AliasTarball "$verificationDirectory/codex-fastctx-$version.tgz"
-          New-Item -ItemType Directory -Force -Path "dist/npm" | Out-Null
-          Copy-Item -LiteralPath "$verificationDirectory/$package" -Destination "dist/npm/$package"
-
       - uses: actions/upload-artifact@v4
         with:
           name: build-${{ matrix.target }}
-          path: |
-            dist/release/${{ matrix.archive }}
-            dist/npm/*.tgz
+          path: dist/release/${{ matrix.archive }}
           if-no-files-found: error
 
   publish-release:
@@ -357,29 +327,16 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
-      - name: Pack npm launcher and compatibility alias
-        shell: pwsh
-        run: ./scripts/pack-npm-root.ps1 -OutputDirectory "dist/npm"
       - name: Finalize and verify release artifacts
         shell: pwsh
         run: |
           ./scripts/verify-distribution-contract.ps1
           ./scripts/finalize-release-assets.ps1
           ./scripts/verify-release-assets.ps1
-      - name: Retain npm packages for manual publishing
-        uses: actions/upload-artifact@v4
-        with:
-          name: npm-tarballs-${{ github.ref_name }}
-          path: dist/npm/*.tgz
-          if-no-files-found: error
-          retention-days: 90
       - name: Verify annotated release identity
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         shell: pwsh
@@ -391,31 +348,19 @@ jobs:
         run: |
           notes="$RUNNER_TEMP/fastctx-release-notes.md"
           cat > "$notes" <<'EOF'
-          ## FastCtx v0.2.6
+          ## Pennix FastCtx v0.2.7
 
-          Windows on ARM builds, tool schemas every provider accepts, and MCP sessions that survive a failing control center.
-
-          **Upgrading:** replacing the binary is enough. This release does not require `fastctx apply`.
-
-          ### Breaking
-
-          - **`glob` no longer applies Git ignore rules.** `.gitignore`, `.git/info/exclude` and your global Git ignore no longer remove files from a `glob` result, and `.git` is no longer excluded automatically. A model that asked where a file was could previously be told it did not exist, purely because Git ignored it. `filter_mode` is now `ignore` (default, honours plain `.ignore` files) or `all`; the old value `project` is still accepted and behaves as `ignore`. Exclude what you do not want with a negative pattern such as `!target/**`. `grep` and `replace` are unchanged.
+          This PennixRv fork separates FastCtx MCP installation from FastCtx-owned `AGENTS.md` guidance. It is distributed only through this GitHub Release; no upstream npm package name is published or replaced.
 
           ### Added
 
-          - **Windows on ARM.** FastCtx now ships an `aarch64-pc-windows-msvc` build with the same features as every other platform, on GitHub Releases and as `@fastctx/win32-arm64`.
-          - **`glob` can report size and modification time.** Pass `output_mode: "details"` to get each match with its byte size and UTC modification time, instead of following a search with a separate directory listing.
-          - **One `limit` for a whole batch read.** `inspect_local_file` accepts a top-level `limit` next to `files`; it applies to every entry that does not set its own, so a uniform cap no longer has to be repeated per entry.
+          - `fastctx apply --guidance none` installs the MCP integration without reading or changing `AGENTS.md`.
+          - `fastctx guidance status|apply|remove` previews and manages only the receipt-owned FastCtx marker. Foreign, malformed, or changed markers are preserved and rejected.
 
-          ### Fixed
+          ### Migration
 
-          - **A failing control center no longer ends your conversations.** One host process runs many conversations that share a single control center, and Codex never restarts an MCP server it has lost — so one failure took every conversation of that user down at once, with no way back except starting over. A session now settles what it owes, swaps in another engine and continues; only the host ends a session.
-          - **Tool schemas are published in a portable subset.** Schemas used `$ref` and composition, which some providers reject outright — and a rejected tool declaration fails the whole request, not one parameter. Every published schema is now a flat, single-type form.
-          - **Git Bash installed through Scoop is found.** `run` reported that no Bash was available on machines where Scoop had installed one.
-          - **Background jobs no longer report a false startup failure on a busy machine.** The supervisor's startup window was too narrow to survive load.
-          - **`run` says which local tasks it is for.** Its description now leads with non-interactive CLI work — Git, build and test tools, package managers, database CLIs, project scripts — before the Bash execution details.
-          - The search CPU limit setting states which event makes a new value take effect: it is read once when the control center starts, which now means after every Codex process has exited.
-          - The pinned Pdfium archive is cached during builds instead of being downloaded once per build unit.
+          - Existing Apply receipts remain compatible and retain their managed guidance until `fastctx guidance remove` is explicitly confirmed.
+          - Pennix deployment writes its own routing marker after removing the FastCtx marker; `fastctx unapply` never removes that Pennix marker.
           EOF
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release delete "${GITHUB_REF_NAME}" --yes
@@ -428,116 +373,3 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: |
           echo "Release artifacts were built and verified without creating or replacing a GitHub Release."
-
-  publish-npm:
-    name: Publish npm packages
-    needs: publish-release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # Trusted publishing exchanges this short-lived OIDC identity for a
-      # registry credential. No npm token exists in this repository.
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: npm-tarballs-${{ github.ref_name }}
-          path: dist/npm
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-      - name: Use an npm release that supports trusted publishing
-        run: npm install --global npm@latest
-      - name: Publish packages in dependency order
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-
-          publish_package() {
-            local name="$1"
-            local tarball="dist/npm/$2-${version}.tgz"
-            if [[ ! -f "$tarball" ]]; then
-              echo "::error::Missing tarball $tarball"
-              exit 1
-            fi
-            # Published versions are immutable, so a partially published release
-            # can only be finished by skipping what already landed. This check
-            # keeps a re-run of this job safe instead of failing on E403.
-            if npm view "$name@$version" version >/dev/null 2>&1; then
-              echo "::notice::$name@$version is already published; skipping"
-              return
-            fi
-            echo "Publishing $name@$version"
-            npm publish "$tarball" --access public
-          }
-
-          # Dependents last: the launcher's optionalDependencies must resolve.
-          publish_package "@fastctx/win32-x64" "fastctx-win32-x64"
-          publish_package "@fastctx/win32-arm64" "fastctx-win32-arm64"
-          publish_package "@fastctx/linux-x64" "fastctx-linux-x64"
-          publish_package "@fastctx/darwin-x64" "fastctx-darwin-x64"
-          publish_package "@fastctx/darwin-arm64" "fastctx-darwin-arm64"
-          publish_package "fastctx" "fastctx"
-          publish_package "codex-fastctx" "codex-fastctx"
-      - name: Confirm registry visibility
-        shell: bash
-        run: |
-          set -uo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          packages=(
-            "@fastctx/win32-x64"
-            "@fastctx/win32-arm64"
-            "@fastctx/linux-x64"
-            "@fastctx/darwin-x64"
-            "@fastctx/darwin-arm64"
-            "fastctx"
-            "codex-fastctx"
-          )
-          # The registry read path lags publish by minutes, so absence here is a
-          # propagation notice rather than a failed publish.
-          lagging=()
-          for name in "${packages[@]}"; do
-            visible=""
-            for _ in $(seq 1 10); do
-              if npm view "$name@$version" version >/dev/null 2>&1; then
-                visible="yes"
-                break
-              fi
-              sleep 30
-            done
-            if [[ -n "$visible" ]]; then
-              echo "$name@$version is visible"
-            else
-              lagging+=("$name")
-            fi
-          done
-          if [[ "${#lagging[@]}" -gt 0 ]]; then
-            echo "::warning::Still propagating after 5 minutes: ${lagging[*]}"
-          fi
-      - name: Request npmmirror synchronization
-        shell: bash
-        run: |
-          set -uo pipefail
-          # Mirrors copy new versions lazily, which strands users whose registry
-          # is a mirror. This asks npmmirror to enqueue each package now; the
-          # response only acknowledges the request, not its completion.
-          for name in \
-            "%40fastctx%2Fwin32-x64" \
-            "%40fastctx%2Fwin32-arm64" \
-            "%40fastctx%2Flinux-x64" \
-            "%40fastctx%2Fdarwin-x64" \
-            "%40fastctx%2Fdarwin-arm64" \
-            "fastctx" \
-            "codex-fastctx"
-          do
-            status="$(curl -sS -o /dev/null -w '%{http_code}' -X PUT \
-              "https://registry.npmmirror.com/-/package/${name}/syncs" || echo "000")"
-            if [[ "$status" == "2"* ]]; then
-              echo "Sync queued for ${name} (HTTP ${status})"
-            else
-              echo "::warning::npmmirror sync request for ${name} returned HTTP ${status}"
-            fi
-          done

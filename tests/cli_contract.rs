@@ -278,6 +278,89 @@ fn apply_status_and_unapply_cover_both_shell_states() {
 }
 
 #[test]
+fn guidance_can_be_disabled_managed_separately_and_never_removes_pennix_content() {
+    let temp = tempfile::tempdir().unwrap();
+    let codex = temp.path().join(".codex");
+    let applied = isolated_command(temp.path())
+        .args(["apply", "--guidance", "none", "--yes"])
+        .output()
+        .unwrap();
+    assert_success(&applied);
+    assert!(codex.join("config.toml").is_file());
+    assert!(!codex.join("AGENTS.md").exists());
+
+    let guidance_status = isolated_command(temp.path())
+        .args(["guidance", "status"])
+        .output()
+        .unwrap();
+    assert_success(&guidance_status);
+    assert!(
+        String::from_utf8_lossy(&guidance_status.stdout).contains("absent (disabled)"),
+        "{}",
+        String::from_utf8_lossy(&guidance_status.stdout)
+    );
+
+    let foreign = "<!-- fastctx:begin -->\nforeign\n<!-- fastctx:end -->\n";
+    std::fs::write(codex.join("AGENTS.md"), foreign).unwrap();
+    let refused = isolated_command(temp.path())
+        .args(["guidance", "apply", "--yes"])
+        .output()
+        .unwrap();
+    assert!(!refused.status.success());
+    assert!(
+        String::from_utf8_lossy(&refused.stderr).contains("does not own"),
+        "{}",
+        String::from_utf8_lossy(&refused.stderr)
+    );
+    assert_eq!(
+        std::fs::read_to_string(codex.join("AGENTS.md")).unwrap(),
+        foreign
+    );
+
+    std::fs::write(codex.join("AGENTS.md"), "# user rules\n").unwrap();
+    let guidance_applied = isolated_command(temp.path())
+        .args(["guidance", "apply", "--yes"])
+        .output()
+        .unwrap();
+    assert_success(&guidance_applied);
+    let agents = std::fs::read_to_string(codex.join("AGENTS.md")).unwrap();
+    assert_eq!(
+        agents.matches("<!-- fastctx:begin -->").count(),
+        1,
+        "{agents}"
+    );
+
+    let guidance_removed = isolated_command(temp.path())
+        .args(["guidance", "remove", "--yes"])
+        .output()
+        .unwrap();
+    assert_success(&guidance_removed);
+    assert_eq!(
+        std::fs::read_to_string(codex.join("AGENTS.md")).unwrap(),
+        "# user rules\n"
+    );
+
+    let pennix = concat!(
+        "# user rules\n\n",
+        "<!-- pennix-fastctx:begin -->\n",
+        "## FastCtx Routing\n\n",
+        "- Use `$pennix-fastctx-routing`.\n",
+        "<!-- pennix-fastctx:end -->\n"
+    );
+    std::fs::write(codex.join("AGENTS.md"), pennix).unwrap();
+    let removed = isolated_command(temp.path())
+        .args(["unapply", "--yes"])
+        .output()
+        .unwrap();
+    assert_success(&removed);
+    assert_eq!(
+        std::fs::read_to_string(codex.join("AGENTS.md")).unwrap(),
+        pennix
+    );
+    assert!(!temp.path().join(".fastctx").exists());
+}
+
+#[test]
 fn apply_migrates_owned_three_server_config_and_legacy_agents_blocks_atomically() {
     let temp = tempfile::tempdir().unwrap();
     let codex = temp.path().join(".codex");

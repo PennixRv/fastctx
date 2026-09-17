@@ -4,12 +4,13 @@
   "description": "FastCtx — fast, context-efficient repository tools for AI agents.",
   "author": "yc-duan <dy2958830371@gmail.com>",
   "license": "Apache-2.0",
+  "private": true,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yc-duan/fastctx.git"
+    "url": "git+https://github.com/PennixRv/fastctx.git"
   },
-  "homepage": "https://github.com/yc-duan/fastctx#readme",
-  "bugs": "https://github.com/yc-duan/fastctx/issues",
+  "homepage": "https://github.com/PennixRv/fastctx#readme",
+  "bugs": "https://github.com/PennixRv/fastctx/issues",
   "engines": {
     "node": ">=18"
   },

@@ -666,8 +666,9 @@ pub struct AppliedRecord {
     pub codex_dir_created: bool,
     /// Ownership receipt for Codex config.
     pub codex_config: ManagedFileRecord,
-    /// Ownership receipt for Codex AGENTS.md.
-    pub codex_agents: ManagedFileRecord,
+    /// Ownership receipt for the FastCtx marker in Codex AGENTS.md, when guidance is managed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub codex_agents: Option<ManagedFileRecord>,
     /// Managed-section contract recorded by an explicit Apply; absent in older receipts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agents_contract_id: Option<String>,
@@ -682,7 +683,6 @@ impl AppliedRecord {
     /// Reports whether this receipt owns the Codex files selected by the current profile resolver.
     pub fn targets_codex_profile(&self, paths: &ControlPaths) -> bool {
         paths_refer_to_same_location(Path::new(&self.codex_config.path), &paths.codex_config)
-            && paths_refer_to_same_location(Path::new(&self.codex_agents.path), &paths.codex_agents)
     }
 }
 

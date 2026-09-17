@@ -953,12 +953,6 @@ fn receipt_drift(
         "Codex config receipt",
         &mut drift,
     );
-    check_recorded_path(
-        &paths.codex_agents,
-        &record.codex_agents,
-        "AGENTS receipt",
-        &mut drift,
-    );
     if record.command != crate::paths::display_path(&paths.installed_binary) {
         drift.push("installed binary receipt path".to_string());
     }
@@ -975,6 +969,24 @@ fn receipt_drift(
         }
     }
     Ok(drift)
+}
+
+/// Inspects only the FastCtx guidance state for scriptable `guidance status` output.
+pub fn guidance_check(paths: &ControlPaths) -> DoctorCheck {
+    match settings::load(paths) {
+        Ok(settings) => {
+            let applied = settings
+                .applied
+                .as_ref()
+                .filter(|record| record.targets_codex_profile(paths));
+            check_agents(paths, applied)
+        }
+        Err(error) => DoctorCheck::fail(
+            "AGENTS guidance",
+            error,
+            "Repair ~/.fastctx/config.toml, then run fastctx guidance status again.",
+        ),
+    }
 }
 
 fn check_recorded_path(
@@ -1090,6 +1102,24 @@ fn check_agents_state(
     state: agents::ManagedSectionState,
 ) -> DoctorCheck {
     let has_receipt = applied.is_some();
+    if applied.is_some_and(|record| record.codex_agents.is_none()) {
+        return match state {
+            agents::ManagedSectionState::Missing => DoctorCheck::pass(
+                "AGENTS guidance",
+                "State: absent (disabled). The Apply receipt manages FastCtx MCP configuration without a FastCtx guidance block.",
+            ),
+            agents::ManagedSectionState::Malformed(error) => DoctorCheck::fail(
+                "AGENTS guidance",
+                format!("State: foreign or malformed. {error}"),
+                "Repair the FastCtx markers manually or run fastctx guidance apply only after removing the foreign block.",
+            ),
+            _ => DoctorCheck::fail(
+                "AGENTS guidance",
+                "State: foreign. The Apply receipt has guidance disabled, but AGENTS.md contains a FastCtx marker that FastCtx does not own.",
+                "Review the marker manually before running fastctx guidance apply or remove.",
+            ),
+        };
+    }
     match state {
         agents::ManagedSectionState::Current
             if applied.is_some_and(|record| {

@@ -1,4 +1,4 @@
-# FastCtx
+# FastCtx — Pennix fork
 
 **English** | [简体中文](./README.zh-CN.md)
 
@@ -12,12 +12,7 @@ Each `fastctx serve` process is a thin stdio proxy. Proxies for the same user an
 
 An MCP session ends when its host ends it, never because the shared runtime had a problem. If the control center becomes unreachable, the proxy answers the calls it can no longer complete with an explicit error, reconnects to a replacement — starting one, or running the engine inside the proxy itself — and carries on over the same stdio transport. Side-effecting calls are never replayed. The control center itself stays resident while any host process that used it is still running, and exits ten minutes after the last of them is gone, with no connection, no active request, and no running background job.
 
-```console
-npm install --global fastctx
-fastctx
-```
-
-The `fastctx` command opens the control terminal. Review the proposed changes, select **Connect to Codex**, then start a new ChatGPT / Codex session.
+This Pennix fork is distributed only as a GitHub Release from [`PennixRv/fastctx`](https://github.com/PennixRv/fastctx). Use the `pennix-fastctx-setup` Skill to download the verified platform archive, preview the Codex changes, and apply them explicitly.
 
 FastCtx currently provides first-class setup for ChatGPT App and Codex CLI. Any MCP client can also register `fastctx serve` directly.
 
@@ -41,14 +36,9 @@ This greatly reduces the attention the model spends on tool mechanics, such as c
 
 ## Installation
 
-### Install with npm
+### Install with the Pennix setup Skill
 
-Requires Node.js 18 or later:
-
-```console
-npm install --global fastctx
-fastctx
-```
+The supported path is `pennix-fastctx-setup`: it fetches a pinned GitHub Release asset, verifies `SHA256SUMS`, then invokes `fastctx apply --guidance none` through a preview and explicit confirmation. This fork never publishes, installs, or updates the upstream `fastctx` npm package.
 
 The first launch opens the full-screen control terminal. The interface supports 17 languages and provides these main actions:
 
@@ -60,53 +50,29 @@ The first launch opens the full-screen control terminal. The interface supports 
 6. Reset all user preferences to factory defaults through a confirmation screen;
 7. Review every host configuration change on the Connect to Codex screen, confirm it, and restart the ChatGPT / Codex session.
 
-Connecting copies the current binary to `~/.fastctx/bin/` and points the host configuration at that stable path. The connected setup keeps working after npm cache cleanup or upgrades.
+Connecting copies the verified release binary to `~/.fastctx/bin/` and points the host configuration at that stable path.
 
-On launch, FastCtx checks its launch channel for updates before the main menu opens. A brief checking screen appears and the wait is strictly bounded: if the check cannot finish — offline, timeout, rate limiting — FastCtx enters silently, and the dedicated **Update** screen still offers a manual check at any time. When a newer version is installable, the update screen opens directly and asks whether to **Update & restart** or **Continue** into the current version. Successful results are cached for 24 hours in machine-private storage outside `~/.fastctx`, so most launches skip the network entirely. npm launches query the exact launcher package through a fresh isolated cache with `--prefer-online`; direct GitHub Release executables read the stable tag from GitHub's `releases/latest` web redirect.
-
-If GitHub has published a release but npm has not exposed the matching version yet, FastCtx shows a propagation screen instead of trusting stale metadata. **Retry** always uses another isolated cache; it never clears or mutates the user's normal npm cache. Transient network or rate-limit failures stay quiet and are recorded under **Status**; malformed publication metadata produces one warning. Status also offers a manual check that bypasses the 24-hour TTL. An accepted npm update installs the exact version with lifecycle scripts disabled. A GitHub Release update downloads this repository's platform archive and aggregate `SHA256SUMS`, verifies the archive before safely extracting the binary, probes the downloaded version, replaces the executable atomically, and rolls back when restart health fails. A failed npm update restores the exact previous package version; every failed update reopens the previous TUI with a warning. After a successful restart, the owned `~/.fastctx/bin/` copy is synchronized; externally changed copies are left untouched. Restart Codex after an update so existing sessions and their build-isolated control center are replaced by the new build.
+GitHub Release executables check `PennixRv/fastctx` for newer releases. An accepted update downloads the pinned platform archive and aggregate `SHA256SUMS`, verifies the archive before safely extracting the binary, probes the downloaded version, replaces the executable atomically, and rolls back when restart health fails.
 
 `cargo install` builds and the internal `~/.fastctx/bin/` runtime are not self-updated. Set `FASTCTX_DISABLE_UPDATE_CHECK=1` to disable the TUI startup check.
 
 **Removal** stops FastCtx process images running from the managed bin directory, removes the configuration managed by FastCtx, and deletes its managed data. Shared settings changed by the user after connecting are preserved.
 
-### If the install returns 404
-
-Mirror registries copy new releases from the official registry on a delay. Right after a release, an install through a mirror can fail with `404 Not Found` — most often on the platform package, which npm installs as an optional dependency and skips silently, leaving `fastctx` installed but unable to start.
-
-Install once from the official registry:
-
-```console
-npm install --global fastctx --registry=https://registry.npmjs.org/
-```
-
-The flag applies to this command only and leaves the npm configuration unchanged. To use the official registry permanently:
-
-```console
-npm config set registry https://registry.npmjs.org/ --location=user
-```
-
-After installation, the **Update** screen probes the npm registry configured on this machine, the official registry, and registry.npmmirror.com, then installs from the first source that carries both the launcher and the matching platform package. Version numbers always come from the official registry and GitHub, so a mirror can never announce a version the official source has not published.
-
-### One-off run
-
-```console
-npx fastctx
-```
-
-`npx` opens the same control terminal without a global installation. Connecting still copies the binary to `~/.fastctx/bin/`, so the connected setup keeps working after the npx cache is cleaned; only the `fastctx` command itself requires the global installation.
-
 ### Non-interactive use
 
 ```console
-fastctx apply --tier standard --yes
+fastctx apply --tier standard --guidance none --yes
+fastctx guidance status
+fastctx guidance apply --yes
+fastctx guidance remove --yes
 fastctx status
 fastctx jobs
 fastctx jobs kill j-a1b2c3
 fastctx unapply --yes
 ```
 
-- `apply`: install FastCtx and write the configuration;
+- `apply`: install FastCtx and write the MCP configuration; the default `managed` guidance mode remains compatible with upstream, while `--guidance none` leaves `AGENTS.md` untouched;
+- `guidance`: inspect, add, or remove only the receipt-owned FastCtx marker after a preview;
 - `status`: check the configuration, binary, and MCP handshake;
 - `jobs`: list running background jobs;
 - `jobs kill <job_id>`: stop one background job and its full process tree;
@@ -141,9 +107,7 @@ max_file_size_mib = 512
 
 ### Other distribution channels
 
-```console
-cargo install fastctx --locked
-```
+Build an unmanaged local binary with `cargo build --release`; it does not participate in the Pennix updater or setup workflow.
 
 GitHub Releases provides zip archives for Windows x64 and Windows arm64, and executable-preserving tar.gz archives for Linux x64, macOS x64, and macOS arm64. Every archive includes the binary and license notices; verify it with the release's aggregate `SHA256SUMS`.
 
@@ -391,7 +355,7 @@ The FastCtx MCP server inherits the local permissions of the host process.
 | `inspect_local_file` / `grep` / `glob` | Enabled | Local files readable by the host process |
 | `replace` | Enabled | Local file writes with dry-run, CAS, and atomic replacement safeguards |
 | Bash tools | Disabled | Bash command execution after the user enables them |
-| TUI update check | Enabled for npm and GitHub Release launches | Version metadata from `registry.npmjs.org` and GitHub's `releases/latest` web redirect; downloads require explicit confirmation |
+| TUI update check | Enabled for GitHub Release launches | Version metadata from `PennixRv/fastctx`'s `releases/latest` redirect; downloads require explicit confirmation |
 | MCP runtime network requests | None | `serve`, private local proxy traffic, and tool calls perform no telemetry or update traffic |
 
 The startup check sends the FastCtx version, normal HTTPS request metadata, and npm's standard registry request; it never sends repository paths, job data, or file contents. Background jobs persist their command, working directory, retained output prefix, truncation state, and exit status only in the current user's private `~/.fastctx/jobs/` directory. Proxy-to-control-center traffic stays on an owner-private Unix-domain socket or Windows named pipe. FastCtx does not upload this data. Bash commands can access the network according to the command itself. Prebuilt binaries include the PDF engine.
@@ -417,7 +381,7 @@ FastCtx uses or manages these paths and settings:
 - `~/.fastctx/jobs/`: persistent background-job records and current-format full output logs, created on demand by `run_background`;
 - `[mcp_servers.fastctx]` in `~/.codex/config.toml`, including `tool_timeout_sec = 300`;
 - the `mcp__fastctx` entry in `direct_only_tool_namespaces`;
-- the marker-delimited FastCtx block in `~/.codex/AGENTS.md`;
+- the marker-delimited FastCtx block in `~/.codex/AGENTS.md` only when guidance is explicitly managed;
 - the selected `tool_output_token_limit` value after user confirmation.
 
 FastCtx edits existing TOML with `toml_edit`, preserving comments, formatting, and unrelated configuration. Removal removes entries according to write ownership and preserves later user changes. It stops running background jobs before removing `~/.fastctx/`.
@@ -430,9 +394,9 @@ If you redistribute FastCtx, bundle it into another product, or build on top of 
 
 Third-party notices for the bundled Pdfium build are listed in [`THIRD_PARTY_LICENSES.md`](./THIRD_PARTY_LICENSES.md).
 
-## Contact
+## Distribution
 
-FastCtx is created and maintained by [yc-duan](https://github.com/yc-duan). For integration, redistribution, partnership, or anything else, feel free to reach out: dy2958830371@gmail.com.
+`PennixRv/fastctx` is a Pennix-maintained fork of [yc-duan/fastctx](https://github.com/yc-duan/fastctx). Pennix changes are distributed from this repository and do not imply upstream endorsement.
 
 ## Acknowledgements
 
