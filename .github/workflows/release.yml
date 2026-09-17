@@ -329,7 +329,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
-          path: dist
+          path: dist/release
           merge-multiple: true
       - name: Finalize and verify release artifacts
         shell: pwsh

@@ -34,6 +34,7 @@ foreach ($required in @(
     "finalize-release-assets.ps1",
     "verify-release-assets.ps1",
     "verify-release-identity.ps1 -TagName `$env:GITHUB_REF_NAME",
+    "path: dist/release",
     "dist/release/*",
     "workflow_dispatch:",
     "cargo install cargo-zigbuild --locked --version 0.23.0",
