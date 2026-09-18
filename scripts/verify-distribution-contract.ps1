@@ -34,6 +34,7 @@ foreach ($required in @(
     "finalize-release-assets.ps1",
     "verify-release-assets.ps1",
     "verify-release-identity.ps1 -TagName `$env:GITHUB_REF_NAME",
+    "pattern: build-*",
     "path: dist/release",
     "dist/release/*",
     "workflow_dispatch:",

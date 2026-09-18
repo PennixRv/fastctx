@@ -348,6 +348,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
+          pattern: build-*
           path: dist/release
           merge-multiple: true
       - uses: actions/download-artifact@v4
@@ -413,7 +414,7 @@ jobs:
         run: |
           notes="$RUNNER_TEMP/fastctx-release-notes.md"
           cat > "$notes" <<'EOF'
-          ## Pennix FastCtx v0.2.8
+          ## Pennix FastCtx v0.2.9
 
           This PennixRv fork publishes the scoped npm package family `@pennixrv/fastctx*`; it never publishes or replaces an upstream npm package name. Normal Apply and TUI installation leave `AGENTS.md` untouched; Pennix keeps its static guidance in its own templates.
 
