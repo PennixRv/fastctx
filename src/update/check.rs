@@ -2,9 +2,9 @@
 
 use super::cache::{self, CachedOutcome, CheckStatus};
 use super::model::{
-    CheckFailure, CheckFailureKind, NPMMIRROR_REGISTRY, NpmDiscovery, NpmDriver, NpmMode,
-    NpmProvenance, NpmRegistryProbe, NpmVersionAuthority, OFFICIAL_NPM_REGISTRY, StartupUpdate,
-    UpdatePlan,
+    CheckFailure, CheckFailureKind, NPM_COMPAT_PACKAGE, NPM_MAIN_PACKAGE, NPMMIRROR_REGISTRY,
+    NpmDiscovery, NpmDriver, NpmMode, NpmProvenance, NpmRegistryProbe, NpmVersionAuthority,
+    OFFICIAL_NPM_REGISTRY, StartupUpdate, UpdatePlan,
 };
 use crate::control::paths::ControlPaths;
 use crate::control::settings::{self, UpdateSource};
@@ -512,7 +512,7 @@ fn probe_npm_channel_with_backend(
             .into_iter()
             .map(|candidate| {
                 scope.spawn(move || RegistryLatest {
-                    result: backend.latest_npm_version(&candidate.registry, "fastctx"),
+                    result: backend.latest_npm_version(&candidate.registry, NPM_MAIN_PACKAGE),
                     candidate,
                 })
             })
@@ -790,8 +790,8 @@ fn registry_readiness(
         }
     };
     let target = target_version.to_string();
-    let mut packages = vec!["fastctx".to_string()];
-    if provenance.package != "fastctx" {
+    let mut packages = vec![NPM_MAIN_PACKAGE.to_string()];
+    if provenance.package != NPM_MAIN_PACKAGE {
         packages.push(provenance.package.clone());
     }
     packages.push(platform_package.to_string());
@@ -812,7 +812,7 @@ fn registry_readiness(
             })
             .collect::<Vec<_>>()
     });
-    let main_count = if provenance.package == "fastctx" {
+    let main_count = if provenance.package == NPM_MAIN_PACKAGE {
         1
     } else {
         2
@@ -918,9 +918,9 @@ fn channel_key(channel: &InstallChannel, npm_context: Option<&NpmCheckContext>) 
                 .iter()
                 .map(|byte| format!("{byte:02x}"))
                 .collect::<String>();
+            let package_key = provenance.package.replace('@', "").replace('/', "-");
             Some(format!(
-                "npm-{}-{}-{fingerprint}",
-                provenance.package,
+                "npm-{package_key}-{}-{fingerprint}",
                 context.source_policy.as_str()
             ))
         }
@@ -1038,7 +1038,7 @@ fn npm_receipt_version(
         "1" => Ok(Some(NpmReceiptVersion::V1)),
         "2" => Ok(Some(NpmReceiptVersion::V2)),
         _ => Err(format!(
-            "the npm launcher reported unsupported receipt version {value:?}; reinstall FastCtx with `npm install --global fastctx --registry=https://registry.npmjs.org/`"
+            "the npm launcher reported unsupported receipt version {value:?}; reinstall FastCtx with `npm install --global @pennixrv/fastctx --registry=https://registry.npmjs.org/`"
         )),
     }
 }
@@ -1049,7 +1049,7 @@ fn npm_provenance(
     receipt_version: NpmReceiptVersion,
 ) -> Result<NpmProvenance, String> {
     let package = required_utf8_env(get_env, NPM_PACKAGE_ENV)?;
-    if !matches!(package.as_str(), "fastctx" | "codex-fastctx") {
+    if !matches!(package.as_str(), NPM_MAIN_PACKAGE | NPM_COMPAT_PACKAGE) {
         return Err(format!(
             "the npm launcher reported unsupported package {package:?}"
         ));
@@ -1574,11 +1574,11 @@ fn expected_release_archive_name() -> Option<&'static str> {
 
 fn platform_npm_package() -> Option<&'static str> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("windows", "x86_64") => Some("@fastctx/win32-x64"),
-        ("windows", "aarch64") => Some("@fastctx/win32-arm64"),
-        ("linux", "x86_64") => Some("@fastctx/linux-x64"),
-        ("macos", "x86_64") => Some("@fastctx/darwin-x64"),
-        ("macos", "aarch64") => Some("@fastctx/darwin-arm64"),
+        ("windows", "x86_64") => Some("@pennixrv/fastctx-win32-x64"),
+        ("windows", "aarch64") => Some("@pennixrv/fastctx-win32-arm64"),
+        ("linux", "x86_64") => Some("@pennixrv/fastctx-linux-x64"),
+        ("macos", "x86_64") => Some("@pennixrv/fastctx-darwin-x64"),
+        ("macos", "aarch64") => Some("@pennixrv/fastctx-darwin-arm64"),
         _ => None,
     }
 }

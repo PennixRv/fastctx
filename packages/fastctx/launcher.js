@@ -10,11 +10,11 @@ const fastctxHome = process.platform === 'win32'
   : process.env.HOME || os.homedir();
 
 const targets = {
-  'win32-x64': ['@fastctx/win32-x64', 'fastctx.exe'],
-  'win32-arm64': ['@fastctx/win32-arm64', 'fastctx.exe'],
-  'linux-x64': ['@fastctx/linux-x64', 'fastctx'],
-  'darwin-x64': ['@fastctx/darwin-x64', 'fastctx'],
-  'darwin-arm64': ['@fastctx/darwin-arm64', 'fastctx'],
+  'win32-x64': ['@pennixrv/fastctx-win32-x64', 'fastctx.exe'],
+  'win32-arm64': ['@pennixrv/fastctx-win32-arm64', 'fastctx.exe'],
+  'linux-x64': ['@pennixrv/fastctx-linux-x64', 'fastctx'],
+  'darwin-x64': ['@pennixrv/fastctx-darwin-x64', 'fastctx'],
+  'darwin-arm64': ['@pennixrv/fastctx-darwin-arm64', 'fastctx'],
 };
 
 const target = targets[`${process.platform}-${process.arch}`];
@@ -55,7 +55,7 @@ if (platformPackageMissing) {
         `fastctx: platform package ${target[0]} is missing, and no stable copy is installed.`,
         'Your configured npm registry may not have synchronized the platform package yet.',
         'Retry once from the official registry:',
-        '  npm install --global fastctx --registry=https://registry.npmjs.org/',
+        '  npm install --global @pennixrv/fastctx --registry=https://registry.npmjs.org/',
       ].join('\n'),
     );
     process.exit(1);
@@ -67,7 +67,7 @@ const tuiLaunch = interactive && (args.length === 0 || args[0] === 'ui');
 const FORCE_KILL_DELAY_MS = 5000;
 const UPDATE_HANDOFF_EXIT_CODE = 75;
 const UPDATE_HANDOFF_SCHEMA_VERSION = 2;
-const npmPackage = process.env.FASTCTX_NPM_PACKAGE || 'fastctx';
+const npmPackage = process.env.FASTCTX_NPM_PACKAGE || '@pennixrv/fastctx';
 const npmLauncher = process.env.FASTCTX_NPM_LAUNCHER || __filename;
 const npmMode = process.env.npm_command === 'exec' || npmLauncher
   .split(/[\\/]+/)

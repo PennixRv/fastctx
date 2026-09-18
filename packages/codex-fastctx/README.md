@@ -1,7 +1,7 @@
-# codex-fastctx
+# @pennixrv/codex-fastctx
 
 Compatibility package name for
-[FastCtx](https://github.com/yc-duan/fastctx) — structured repository tools
+[FastCtx](https://github.com/PennixRv/fastctx) — structured repository tools
 for coding agents, Codex first. It contains no binary or install script; its
 tiny command shim forwards directly to the `fastctx` dependency, installing
 the same `fastctx` command. The shim also identifies this compatibility package
@@ -50,7 +50,7 @@ output remains agent-readable through `job_output`; MCP hosts do not expose
 conversation titles or ids, so the dashboard does not fabricate them.
 
 ```console
-npx codex-fastctx
+npx @pennixrv/codex-fastctx
 ```
 
 Prefer installing `fastctx` directly unless you specifically need this name.

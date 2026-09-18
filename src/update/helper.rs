@@ -1,8 +1,8 @@
 //! Copied updater helper, verified installation, rollback, restart, and finalization.
 
 use super::model::{
-    NPMMIRROR_REGISTRY, NpmDriver, NpmMode, NpmProvenance, NpmVersionAuthority,
-    OFFICIAL_NPM_REGISTRY, UpdatePlan, UpdateRequest,
+    NPM_COMPAT_PACKAGE, NPM_MAIN_PACKAGE, NPMMIRROR_REGISTRY, NpmDriver, NpmMode, NpmProvenance,
+    NpmVersionAuthority, OFFICIAL_NPM_REGISTRY, UpdatePlan, UpdateRequest,
 };
 use crate::control::apply::{
     AppliedBinarySync, AppliedGuidanceSync, synchronize_applied_binary,
@@ -1255,7 +1255,10 @@ fn validate_plan(plan: &UpdatePlan) -> Result<(), String> {
             source_name,
             discovery,
         } => {
-            if !matches!(provenance.package.as_str(), "fastctx" | "codex-fastctx") {
+            if !matches!(
+                provenance.package.as_str(),
+                NPM_MAIN_PACKAGE | NPM_COMPAT_PACKAGE | "fastctx" | "codex-fastctx"
+            ) {
                 return Err("update plan has an unsupported npm package".to_string());
             }
             for (name, path) in [
@@ -1748,11 +1751,11 @@ fn expected_release_archive_name() -> Option<&'static str> {
 
 fn expected_npm_platform_package() -> Option<&'static str> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("windows", "x86_64") => Some("@fastctx/win32-x64"),
-        ("windows", "aarch64") => Some("@fastctx/win32-arm64"),
-        ("linux", "x86_64") => Some("@fastctx/linux-x64"),
-        ("macos", "x86_64") => Some("@fastctx/darwin-x64"),
-        ("macos", "aarch64") => Some("@fastctx/darwin-arm64"),
+        ("windows", "x86_64") => Some("@pennixrv/fastctx-win32-x64"),
+        ("windows", "aarch64") => Some("@pennixrv/fastctx-win32-arm64"),
+        ("linux", "x86_64") => Some("@pennixrv/fastctx-linux-x64"),
+        ("macos", "x86_64") => Some("@pennixrv/fastctx-darwin-x64"),
+        ("macos", "aarch64") => Some("@pennixrv/fastctx-darwin-arm64"),
         _ => None,
     }
 }

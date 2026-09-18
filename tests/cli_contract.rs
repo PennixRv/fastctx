@@ -50,7 +50,7 @@ fn unapply_stops_a_real_persistent_job_before_removing_fastctx_data() {
     let temp = tempfile::tempdir().unwrap();
     write_shell_settings(temp.path(), true);
     let applied = isolated_command(temp.path())
-        .args(["apply", "--yes"])
+        .args(["apply", "--guidance", "managed", "--yes"])
         .output()
         .unwrap();
     assert_success(&applied);
@@ -88,7 +88,7 @@ fn codex_home_env_selects_the_profile_without_moving_fastctx_state() {
     let profile = temp.path().join("relocated-codex-profile");
 
     let applied = isolated_command(temp.path())
-        .args(["apply", "--yes"])
+        .args(["apply", "--guidance", "managed", "--yes"])
         .env("CODEX_HOME", &profile)
         .output()
         .unwrap();
@@ -221,7 +221,7 @@ fn apply_status_and_unapply_cover_both_shell_states() {
         let temp = tempfile::tempdir().unwrap();
         write_shell_settings(temp.path(), fastshell);
         let applied = isolated_command(temp.path())
-            .args(["apply", "--yes"])
+            .args(["apply", "--guidance", "managed", "--yes"])
             .output()
             .unwrap();
         assert_success(&applied);
@@ -282,7 +282,7 @@ fn guidance_can_be_disabled_managed_separately_and_never_removes_pennix_content(
     let temp = tempfile::tempdir().unwrap();
     let codex = temp.path().join(".codex");
     let applied = isolated_command(temp.path())
-        .args(["apply", "--guidance", "none", "--yes"])
+        .args(["apply", "--yes"])
         .output()
         .unwrap();
     assert_success(&applied);
@@ -428,7 +428,7 @@ fn apply_migrates_owned_three_server_config_and_legacy_agents_blocks_atomically(
     std::fs::write(codex.join("AGENTS.md"), agents).unwrap();
 
     let output = isolated_command(temp.path())
-        .args(["apply", "--yes"])
+        .args(["apply", "--guidance", "managed", "--yes"])
         .output()
         .unwrap();
     assert_success(&output);

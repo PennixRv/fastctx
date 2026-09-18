@@ -45,6 +45,14 @@ foreach ($required in @(
     "ubuntu:20.04",
     "ubuntu:22.04",
     "github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')"
+    "stage-npm-package.ps1"
+    "pack-npm-root.ps1"
+    "verify-npm-install.ps1"
+    "Publish npm packages"
+    "secrets.NPM_TOKEN"
+    "NPM_CONFIG_PROVENANCE"
+    "npm publish"
+    "id-token: write"
 )) {
     if (-not $releaseWorkflow.Contains($required)) {
         throw "Release workflow is missing distribution contract marker: $required"

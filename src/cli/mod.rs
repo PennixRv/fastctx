@@ -50,8 +50,8 @@ enum Command {
         /// Host output tier; defaults to the saved selection.
         #[arg(long, value_enum)]
         tier: Option<Tier>,
-        /// Whether FastCtx manages its marker block in AGENTS.md.
-        #[arg(long, value_enum, default_value_t = GuidanceMode::Managed)]
+        /// Whether FastCtx manages its marker block in AGENTS.md; defaults to none.
+        #[arg(long, value_enum, default_value_t = GuidanceMode::None)]
         guidance: GuidanceMode,
         /// Accept the preview and any shared-limit conflict.
         #[arg(long)]

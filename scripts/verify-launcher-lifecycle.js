@@ -14,11 +14,11 @@ const SIGNAL_FORWARD_DEADLINE_MS = 3000;
 // Mirrors the launcher's own platform map. Declared once here so that adding a
 // release platform cannot leave a check silently skipping the host it runs on.
 const PLATFORM_TARGETS = {
-  'win32-x64': ['@fastctx/win32-x64', 'fastctx.exe'],
-  'win32-arm64': ['@fastctx/win32-arm64', 'fastctx.exe'],
-  'linux-x64': ['@fastctx/linux-x64', 'fastctx'],
-  'darwin-x64': ['@fastctx/darwin-x64', 'fastctx'],
-  'darwin-arm64': ['@fastctx/darwin-arm64', 'fastctx'],
+  'win32-x64': ['@pennixrv/fastctx-win32-x64', 'fastctx.exe'],
+  'win32-arm64': ['@pennixrv/fastctx-win32-arm64', 'fastctx.exe'],
+  'linux-x64': ['@pennixrv/fastctx-linux-x64', 'fastctx'],
+  'darwin-x64': ['@pennixrv/fastctx-darwin-x64', 'fastctx'],
+  'darwin-arm64': ['@pennixrv/fastctx-darwin-arm64', 'fastctx'],
 };
 
 function hostTarget() {
@@ -555,7 +555,7 @@ function assertMissingPlatformPackageUsesStableCopyOrGivesAnActionableExit() {
     for (const expected of [
       `platform package ${target[0]} is missing`,
       'registry may not have synchronized',
-      'npm install --global fastctx --registry=https://registry.npmjs.org/',
+      'npm install --global @pennixrv/fastctx --registry=https://registry.npmjs.org/',
     ]) {
       if (!unavailable.stderr.includes(expected)) {
         throw new Error(`double-missing launcher omitted ${expected}: ${unavailable.stderr}`);
@@ -572,9 +572,9 @@ function assertUpdateHandoffKeepsLauncherAlive() {
     const packageRoot = path.join(workspace, 'node_modules', 'fastctx');
     fs.mkdirSync(packageRoot, { recursive: true });
     const inputLauncher = fs.readFileSync(launcher, 'utf8');
-    const isAlias = inputLauncher.includes("require('fastctx/launcher.js')");
+    const isAlias = inputLauncher.includes("require('@pennixrv/fastctx/launcher.js')");
     const mainLauncher = isAlias
-      ? require.resolve('fastctx/launcher.js', { paths: [path.dirname(launcher)] })
+      ? require.resolve('@pennixrv/fastctx/launcher.js', { paths: [path.dirname(launcher)] })
       : launcher;
     const fixtureMainLauncher = path.join(packageRoot, 'launcher.js');
     fs.copyFileSync(mainLauncher, fixtureMainLauncher);
@@ -585,7 +585,7 @@ function assertUpdateHandoffKeepsLauncherAlive() {
       fixtureLauncher = path.join(aliasRoot, 'launcher.js');
       fs.copyFileSync(launcher, fixtureLauncher);
     }
-    const expectedPackage = isAlias ? 'codex-fastctx' : 'fastctx';
+    const expectedPackage = isAlias ? '@pennixrv/codex-fastctx' : '@pennixrv/fastctx';
     const target = hostTarget();
     if (!target) return;
     const platformRoot = path.join(workspace, 'node_modules', target[0]);

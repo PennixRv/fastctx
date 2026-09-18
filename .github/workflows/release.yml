@@ -154,6 +154,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: https://registry.npmjs.org/
       - name: Install pinned Zig
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         uses: mlugg/setup-zig@v2.2.1
@@ -263,6 +268,14 @@ jobs:
             -Target "${{ matrix.target }}" `
             -Binary "target/${{ matrix.target }}/release/${{ matrix.binary }}"
 
+      - name: Stage npm platform package
+        shell: pwsh
+        run: |
+          ./scripts/stage-npm-package.ps1 `
+            -Target "${{ matrix.target }}" `
+            -Binary "target/${{ matrix.target }}/release/${{ matrix.binary }}" `
+            -OutputDirectory "dist/npm"
+
       - name: Smoke-test Linux on glibc 2.31 and 2.35
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         shell: bash
@@ -317,12 +330,18 @@ jobs:
           name: build-${{ matrix.target }}
           path: dist/release/${{ matrix.archive }}
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-${{ matrix.target }}
+          path: dist/npm/*.tgz
+          if-no-files-found: error
 
   publish-release:
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -331,16 +350,62 @@ jobs:
         with:
           path: dist/release
           merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: npm-*
+          path: dist/npm
+          merge-multiple: true
       - name: Finalize and verify release artifacts
         shell: pwsh
         run: |
           ./scripts/verify-distribution-contract.ps1
           ./scripts/finalize-release-assets.ps1
           ./scripts/verify-release-assets.ps1
+          ./scripts/pack-npm-root.ps1 -OutputDirectory dist/npm
+          $version = (Select-String -LiteralPath Cargo.toml -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
+          $platform = Join-Path (Resolve-Path dist/npm) "pennixrv-fastctx-linux-x64-$version.tgz"
+          $main = Join-Path (Resolve-Path dist/npm) "pennixrv-fastctx-$version.tgz"
+          $alias = Join-Path (Resolve-Path dist/npm) "pennixrv-codex-fastctx-$version.tgz"
+          ./scripts/verify-npm-install.ps1 `
+            -PlatformTarball $platform `
+            -MainTarball $main `
+            -AliasTarball $alias
       - name: Verify annotated release identity
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: ./scripts/verify-release-identity.ps1 -TagName $env:GITHUB_REF_NAME
+      - name: Publish npm packages
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
+        run: |
+          $version = (Select-String -LiteralPath Cargo.toml -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
+          $packages = @(
+            @{ Name = "@pennixrv/fastctx-win32-x64"; File = "pennixrv-fastctx-win32-x64-$version.tgz" },
+            @{ Name = "@pennixrv/fastctx-win32-arm64"; File = "pennixrv-fastctx-win32-arm64-$version.tgz" },
+            @{ Name = "@pennixrv/fastctx-linux-x64"; File = "pennixrv-fastctx-linux-x64-$version.tgz" },
+            @{ Name = "@pennixrv/fastctx-darwin-x64"; File = "pennixrv-fastctx-darwin-x64-$version.tgz" },
+            @{ Name = "@pennixrv/fastctx-darwin-arm64"; File = "pennixrv-fastctx-darwin-arm64-$version.tgz" },
+            @{ Name = "@pennixrv/fastctx"; File = "pennixrv-fastctx-$version.tgz" },
+            @{ Name = "@pennixrv/codex-fastctx"; File = "pennixrv-codex-fastctx-$version.tgz" }
+          )
+          foreach ($package in $packages) {
+            $tarball = Join-Path (Resolve-Path dist/npm) $package.File
+            if (-not (Test-Path -LiteralPath $tarball -PathType Leaf)) {
+              throw "Missing npm package artifact: $($package.File)"
+            }
+            $published = (& npm view "$($package.Name)@$version" version --registry https://registry.npmjs.org/ 2>$null).Trim()
+            if ($LASTEXITCODE -eq 0 -and $published -eq $version) {
+              Write-Host "$($package.Name)@$version is already published; keeping the existing immutable version."
+              continue
+            }
+            & npm publish $tarball --access public --provenance --ignore-scripts --registry https://registry.npmjs.org/
+            if ($LASTEXITCODE -ne 0) {
+              throw "npm publish failed for $($package.Name)@$version"
+            }
+          }
       - name: Create exact GitHub Release
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         env:
@@ -348,19 +413,17 @@ jobs:
         run: |
           notes="$RUNNER_TEMP/fastctx-release-notes.md"
           cat > "$notes" <<'EOF'
-          ## Pennix FastCtx v0.2.7
+          ## Pennix FastCtx v0.2.8
 
-          This PennixRv fork separates FastCtx MCP installation from FastCtx-owned `AGENTS.md` guidance. It is distributed only through this GitHub Release; no upstream npm package name is published or replaced.
+          This PennixRv fork publishes the scoped npm package family `@pennixrv/fastctx*`; it never publishes or replaces an upstream npm package name. Normal Apply and TUI installation leave `AGENTS.md` untouched; Pennix keeps its static guidance in its own templates.
 
           ### Added
 
-          - `fastctx apply --guidance none` installs the MCP integration without reading or changing `AGENTS.md`.
-          - `fastctx guidance status|apply|remove` previews and manages only the receipt-owned FastCtx marker. Foreign, malformed, or changed markers are preserved and rejected.
+          - `fastctx apply` installs the MCP integration with guidance disabled by default.
 
           ### Migration
 
-          - Existing Apply receipts remain compatible and retain their managed guidance until `fastctx guidance remove` is explicitly confirmed.
-          - Pennix deployment writes its own routing marker after removing the FastCtx marker; `fastctx unapply` never removes that Pennix marker.
+          - Existing Apply receipts remain compatible; any existing guidance bytes are preserved unless an explicit legacy guidance operation is requested.
           EOF
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release delete "${GITHUB_REF_NAME}" --yes

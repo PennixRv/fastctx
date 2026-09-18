@@ -1,10 +1,9 @@
 {
-  "name": "fastctx",
-  "version": "0.2.6",
+  "name": "@pennixrv/fastctx",
+  "version": "0.2.8",
   "description": "FastCtx — fast, context-efficient repository tools for AI agents.",
-  "author": "yc-duan <dy2958830371@gmail.com>",
+  "author": "PennixRv",
   "license": "Apache-2.0",
-  "private": true,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/PennixRv/fastctx.git"
@@ -23,11 +22,11 @@
     "licenses/**"
   ],
   "optionalDependencies": {
-    "@fastctx/win32-x64": "0.2.6",
-    "@fastctx/win32-arm64": "0.2.6",
-    "@fastctx/linux-x64": "0.2.6",
-    "@fastctx/darwin-x64": "0.2.6",
-    "@fastctx/darwin-arm64": "0.2.6"
+    "@pennixrv/fastctx-win32-x64": "0.2.8",
+    "@pennixrv/fastctx-win32-arm64": "0.2.8",
+    "@pennixrv/fastctx-linux-x64": "0.2.8",
+    "@pennixrv/fastctx-darwin-x64": "0.2.8",
+    "@pennixrv/fastctx-darwin-arm64": "0.2.8"
   },
   "publishConfig": {
     "access": "public"

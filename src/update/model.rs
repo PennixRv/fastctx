@@ -7,6 +7,10 @@ use std::path::PathBuf;
 pub(crate) const OFFICIAL_NPM_REGISTRY: &str = "https://registry.npmjs.org/";
 /// Built-in China mirror whose publication visibility is maintained by the release runbook.
 pub(crate) const NPMMIRROR_REGISTRY: &str = "https://registry.npmmirror.com/";
+/// Published Pennix npm package that owns the FastCtx launcher.
+pub(crate) const NPM_MAIN_PACKAGE: &str = "@pennixrv/fastctx";
+/// Published Pennix compatibility alias for the FastCtx launcher.
+pub(crate) const NPM_COMPAT_PACKAGE: &str = "@pennixrv/codex-fastctx";
 
 /// User-facing severity for an update discovery failure.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

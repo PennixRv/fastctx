@@ -12,11 +12,11 @@ $root = Split-Path -Parent $PSScriptRoot
 $cargoVersion = (Select-String -LiteralPath (Join-Path $root "Cargo.toml") -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
 
 $mapping = @{
-    "x86_64-pc-windows-msvc" = @{ Directory = "fastctx-win32-x64"; Package = "@fastctx/win32-x64"; Name = "fastctx.exe" }
-    "aarch64-pc-windows-msvc" = @{ Directory = "fastctx-win32-arm64"; Package = "@fastctx/win32-arm64"; Name = "fastctx.exe" }
-    "x86_64-unknown-linux-gnu" = @{ Directory = "fastctx-linux-x64"; Package = "@fastctx/linux-x64"; Name = "fastctx" }
-    "x86_64-apple-darwin" = @{ Directory = "fastctx-darwin-x64"; Package = "@fastctx/darwin-x64"; Name = "fastctx" }
-    "aarch64-apple-darwin" = @{ Directory = "fastctx-darwin-arm64"; Package = "@fastctx/darwin-arm64"; Name = "fastctx" }
+    "x86_64-pc-windows-msvc" = @{ Directory = "fastctx-win32-x64"; Package = "@pennixrv/fastctx-win32-x64"; Name = "fastctx.exe" }
+    "aarch64-pc-windows-msvc" = @{ Directory = "fastctx-win32-arm64"; Package = "@pennixrv/fastctx-win32-arm64"; Name = "fastctx.exe" }
+    "x86_64-unknown-linux-gnu" = @{ Directory = "fastctx-linux-x64"; Package = "@pennixrv/fastctx-linux-x64"; Name = "fastctx" }
+    "x86_64-apple-darwin" = @{ Directory = "fastctx-darwin-x64"; Package = "@pennixrv/fastctx-darwin-x64"; Name = "fastctx" }
+    "aarch64-apple-darwin" = @{ Directory = "fastctx-darwin-arm64"; Package = "@pennixrv/fastctx-darwin-arm64"; Name = "fastctx" }
 }
 
 if (-not $mapping.ContainsKey($Target)) {

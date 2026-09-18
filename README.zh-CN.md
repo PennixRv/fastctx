@@ -12,7 +12,7 @@ FastCtx 是一个纯本地的 Rust 工具运行时，通过 MCP 提供文件读�
 
 MCP 会话只由宿主结束，不会因为共享运行时出问题而中断。控制中心不可达时，代理会把无法完成的调用逐条显式报错，再连上一个替代引擎（新拉起一个，或直接在代理自己进程内运行），并在同一条 stdio 通道上继续工作；有副作用的调用绝不重放。控制中心自身则在用过它的宿主进程还活着时一直驻留，等最后一个宿主退出、且没有连接、没有在执行的请求、没有运行中的后台任务之后，再过十分钟退出。
 
-本 Pennix fork 只通过 [`PennixRv/fastctx`](https://github.com/PennixRv/fastctx) 的 GitHub Release 分发。请使用 `pennix-fastctx-setup` Skill 下载已校验的平台归档、预览 Codex 变更并显式应用。
+本 Pennix fork 通过 [`PennixRv/fastctx`](https://github.com/PennixRv/fastctx) 的 scoped npm 包和对应 GitHub Release 资产分发。Pennix Bootstrap 按目录批准的版本安装 npm 包、预览 Codex 变更并显式应用。正常 Apply 和 TUI 路径不触碰 `AGENTS.md`；Pennix 由静态模板维护自己的 guidance。
 
 当前优先支持 ChatGPT App 与 Codex CLI。任何 MCP client 也可以直接注册 `fastctx serve`。
 
@@ -38,7 +38,7 @@ FastCtx 将常见仓库操作整理成结构化输入输出。模型提供路径
 
 ### 使用 Pennix setup Skill 安装
 
-支持的路径是 `pennix-fastctx-setup`：它会获取固定 GitHub Release 资产、校验 `SHA256SUMS`，再通过 preview 和明确确认执行 `fastctx apply --guidance none`。本 fork 不会发布、安装或更新上游 `fastctx` npm 包。
+支持的路径是 Pennix Bootstrap 的 npm 安装：它会按目录批准的版本安装 scoped `@pennixrv/fastctx`，再通过 preview 和明确确认执行 `fastctx apply --guidance none`。本 fork 不会发布、安装或更新上游 `fastctx` npm 包。
 
 首次启动会进入全屏控制终端。界面支持 17 种语言，主要操作包括：
 
@@ -71,7 +71,7 @@ fastctx jobs kill j-a1b2c3
 fastctx unapply --yes
 ```
 
-- `apply`：安装并写入 MCP 配置；默认 `managed` guidance 模式兼容上游，`--guidance none` 不触碰 `AGENTS.md`；
+- `apply`：安装并写入 MCP 配置；默认 guidance 模式为 `none`，正常安装不触碰 `AGENTS.md`；
 - `guidance`：预览后只检查、写入或删除 receipt 所有的 FastCtx marker；
 - `status`：检查配置、二进制和 MCP 握手；
 - `jobs`：列出运行中的后台任务；

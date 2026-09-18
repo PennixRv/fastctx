@@ -761,7 +761,7 @@ impl App {
                     tool_budgets: self.settings.tool_budgets,
                     output_guard_enabled: self.settings.output_guard.enabled,
                     fastshell_enabled: self.settings.fastshell.enabled,
-                    guidance: GuidanceMode::Managed,
+                    guidance: GuidanceMode::None,
                     current_executable: self.current_executable.clone(),
                 },
             )

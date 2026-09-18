@@ -1,10 +1,9 @@
 {
-  "name": "codex-fastctx",
-  "version": "0.2.6",
+  "name": "@pennixrv/codex-fastctx",
+  "version": "0.2.8",
   "description": "Compatibility alias for FastCtx",
-  "author": "yc-duan <dy2958830371@gmail.com>",
+  "author": "PennixRv",
   "license": "Apache-2.0",
-  "private": true,
   "repository": "github:PennixRv/fastctx",
   "homepage": "https://github.com/PennixRv/fastctx#readme",
   "bugs": "https://github.com/PennixRv/fastctx/issues",
@@ -12,7 +11,7 @@
     "fastctx": "launcher.js"
   },
   "dependencies": {
-    "fastctx": "0.2.6"
+    "@pennixrv/fastctx": "0.2.8"
   },
   "files": ["launcher.js", "README.md", "licenses/**"],
   "publishConfig": {"access": "public"}

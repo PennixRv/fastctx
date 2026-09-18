@@ -1,10 +1,9 @@
 {
-  "name": "@fastctx/darwin-arm64",
-  "version": "0.2.6",
+  "name": "@pennixrv/fastctx-darwin-arm64",
+  "version": "0.2.8",
   "description": "FastCtx binary for macOS arm64",
-  "author": "yc-duan <dy2958830371@gmail.com>",
+  "author": "PennixRv",
   "license": "Apache-2.0",
-  "private": true,
   "repository": "github:PennixRv/fastctx",
   "os": ["darwin"],
   "cpu": ["arm64"],

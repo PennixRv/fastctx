@@ -102,18 +102,18 @@ try {
         $aliasDirectory = Expand-Package $aliasTarball "alias"
         $aliasManifestPath = Join-Path $aliasDirectory "package.json"
         $aliasManifest = Get-Content -LiteralPath $aliasManifestPath -Raw | ConvertFrom-Json
-        if ($aliasManifest.dependencies.fastctx -ne $mainManifest.version) {
+        if ($aliasManifest.dependencies.'@pennixrv/fastctx' -ne $mainManifest.version) {
             throw "alias package does not depend on the matching fastctx version"
         }
         if ($aliasManifest.bin.fastctx -ne "launcher.js") {
             throw "alias package does not expose the fastctx command through launcher.js"
         }
         $aliasLauncher = (Get-Content -LiteralPath (Join-Path $aliasDirectory "launcher.js") -Raw) -replace "`r`n", "`n"
-        $expectedAliasLauncher = "#!/usr/bin/env node`n'use strict';`n`nprocess.env.FASTCTX_NPM_PACKAGE = 'codex-fastctx';`nprocess.env.FASTCTX_NPM_LAUNCHER = __filename;`nrequire('fastctx/launcher.js');`n"
+        $expectedAliasLauncher = "#!/usr/bin/env node`n'use strict';`n`nprocess.env.FASTCTX_NPM_PACKAGE = '@pennixrv/codex-fastctx';`nprocess.env.FASTCTX_NPM_LAUNCHER = __filename;`nrequire('@pennixrv/fastctx/launcher.js');`n"
         if ($aliasLauncher -ne $expectedAliasLauncher) {
             throw "alias launcher does not identify its package before forwarding"
         }
-        $aliasManifest.dependencies.fastctx = "file:" + ($localMainTarball -replace '\\', '/')
+        $aliasManifest.dependencies.'@pennixrv/fastctx' = "file:" + ($localMainTarball -replace '\\', '/')
         Write-Manifest $aliasManifest $aliasManifestPath
         $localAliasTarball = Pack-Fixture $aliasDirectory
     }
@@ -159,7 +159,7 @@ try {
         # above for the real published dependency graph.
         npm install --global --prefix $aliasPrefix --ignore-scripts --offline --include=optional $localAliasTarball $platformTarball
         if ($LASTEXITCODE -ne 0) { throw "isolated alias-package npm install failed" }
-        Assert-InstalledPackage $aliasPrefix (Get-InstalledLauncher $aliasPrefix "codex-fastctx")
+        Assert-InstalledPackage $aliasPrefix (Get-InstalledLauncher $aliasPrefix "@pennixrv/codex-fastctx")
     }
 } finally {
     Remove-Item -LiteralPath $workspace -Recurse -Force -ErrorAction SilentlyContinue
