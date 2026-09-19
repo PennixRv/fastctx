@@ -505,7 +505,7 @@ function assertMissingPlatformPackageUsesStableCopyOrGivesAnActionableExit() {
   try {
     const inputLauncher = fs.readFileSync(launcher, 'utf8');
     const mainLauncher = resolveMainLauncher(inputLauncher);
-    const packageRoot = path.join(workspace, 'node_modules', 'fastctx');
+    const packageRoot = path.join(workspace, 'node_modules', '@pennixrv', 'fastctx');
     fs.mkdirSync(packageRoot, { recursive: true });
     const fixtureLauncher = path.join(packageRoot, 'launcher.js');
     fs.copyFileSync(mainLauncher, fixtureLauncher);
@@ -584,7 +584,7 @@ function assertUpdateHandoffKeepsLauncherAlive() {
     fs.copyFileSync(mainLauncher, fixtureMainLauncher);
     let fixtureLauncher = fixtureMainLauncher;
     if (isAlias) {
-      const aliasRoot = path.join(workspace, 'node_modules', 'codex-fastctx');
+      const aliasRoot = path.join(workspace, 'node_modules', '@pennixrv', 'codex-fastctx');
       fs.mkdirSync(aliasRoot, { recursive: true });
       fixtureLauncher = path.join(aliasRoot, 'launcher.js');
       fs.copyFileSync(launcher, fixtureLauncher);
@@ -629,7 +629,9 @@ function assertUpdateHandoffKeepsLauncherAlive() {
       },
     );
     if (nonTui.status !== 0) {
-      throw new Error('npm update provenance leaked into a non-TUI native process');
+      throw new Error(
+        `non-TUI launcher fixture exited ${nonTui.status}: ${nonTui.stderr || nonTui.error || ''}`,
+      );
     }
     const nonTuiPrivateCode = spawnSync(
       process.execPath,
