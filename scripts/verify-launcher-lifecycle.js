@@ -237,9 +237,11 @@ function assertNpmInvocationProvenanceAcrossLayouts() {
     const target = hostTarget();
     if (!target) return;
     const inputLauncher = fs.readFileSync(launcher, 'utf8');
-    const mainLauncher = inputLauncher.includes("require('fastctx/launcher.js')")
-      ? require.resolve('fastctx/launcher.js', { paths: [path.dirname(launcher)] })
-      : launcher;
+    const mainLauncher = inputLauncher.includes("require('@pennixrv/fastctx/launcher.js')")
+      ? require.resolve('@pennixrv/fastctx/launcher.js', { paths: [path.dirname(launcher)] })
+      : inputLauncher.includes("require('fastctx/launcher.js')")
+        ? require.resolve('fastctx/launcher.js', { paths: [path.dirname(launcher)] })
+        : launcher;
     const detachedNode = path.join(
       workspace,
       'detached-node',

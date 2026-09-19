@@ -19,11 +19,14 @@ finalize SHA256SUMS → verify archives → pack root packages → fixture insta
 
 The current blocker is a cross-file ownership error: the distribution contract reads the npm installer script but checks for a JavaScript provenance marker. Keep one content variable per owner and assert each marker against the correct file.
 
+The first new-tag verification also exposed a fixture ownership error: the lifecycle fallback recognized only the retired unscoped forwarding string, so the scoped alias launcher was copied into the main-package fixture and failed to resolve its scoped dependency.
+
 ## Minimal Changes
 
 1. Add a separate launcher verifier content variable and move the provenance marker assertion to it.
 2. Derive release note title from `GITHUB_REF_NAME` rather than a fixed version literal.
 3. Keep existing artifact, package path, alias and identity checks; add only focused regression assertions for the propagation errors.
+4. Resolve both scoped and legacy forwarding launcher forms before copying the main launcher into the fallback fixture.
 
 ## Safety
 
