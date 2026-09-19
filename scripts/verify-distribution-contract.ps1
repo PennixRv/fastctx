@@ -66,12 +66,15 @@ if (-not $releaseFinalizer.Contains("SHA256SUMS")) {
 $npmVerifier = Get-Content -LiteralPath (Join-Path $root "scripts/verify-npm-install.ps1") -Raw
 foreach ($required in @(
     'Get-InstalledLauncher $mainPrefix "@pennixrv/fastctx"',
-    'Get-InstalledLauncher $aliasPrefix "@pennixrv/codex-fastctx"',
-    "captured.package !== '@pennixrv/fastctx'"
+    'Get-InstalledLauncher $aliasPrefix "@pennixrv/codex-fastctx"'
 )) {
     if (-not $npmVerifier.Contains($required)) {
         throw "Npm install verifier is missing scoped package path contract: $required"
     }
+}
+$launcherVerifier = Get-Content -LiteralPath (Join-Path $root "scripts/verify-launcher-lifecycle.js") -Raw
+if (-not $launcherVerifier.Contains("captured.package !== '@pennixrv/fastctx'")) {
+    throw "Launcher lifecycle verifier is missing scoped package provenance contract"
 }
 if ($releaseWorkflow.Contains(".sha256")) {
     throw "Release workflow must not create per-asset .sha256 sidecars"

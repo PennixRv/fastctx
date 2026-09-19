@@ -413,8 +413,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes="$RUNNER_TEMP/fastctx-release-notes.md"
-          cat > "$notes" <<'EOF'
-          ## Pennix FastCtx v0.2.11
+          {
+            printf '## Pennix FastCtx %s\n\n' "$GITHUB_REF_NAME"
+            cat <<'EOF'
 
           This PennixRv fork publishes the scoped npm package family `@pennixrv/fastctx*`; it never publishes or replaces an upstream npm package name. Normal Apply and TUI installation leave `AGENTS.md` untouched; Pennix keeps its static guidance in its own templates.
 
@@ -426,6 +427,7 @@ jobs:
 
           - Existing Apply receipts remain compatible; any existing guidance bytes are preserved unless an explicit legacy guidance operation is requested.
           EOF
+          } > "$notes"
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release delete "${GITHUB_REF_NAME}" --yes
           fi
