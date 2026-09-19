@@ -382,6 +382,8 @@ jobs:
       - name: Publish npm packages
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         shell: pwsh
+        env:
+          NODE_AUTH_TOKEN: ""
         run: |
           $version = (Select-String -LiteralPath Cargo.toml -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
           $packages = @(
