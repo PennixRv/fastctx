@@ -50,14 +50,19 @@ foreach ($required in @(
     "pack-npm-root.ps1"
     "verify-npm-install.ps1"
     "Publish npm packages"
-    "secrets.NPM_TOKEN"
-    "NPM_CONFIG_PROVENANCE"
+    "actions/setup-node@v4"
+    'node-version: "24"'
+    "registry-url: https://registry.npmjs.org/"
     "npm publish"
+    "--provenance"
     "id-token: write"
 )) {
     if (-not $releaseWorkflow.Contains($required)) {
         throw "Release workflow is missing distribution contract marker: $required"
     }
+}
+if ($releaseWorkflow.Contains("secrets.NPM_TOKEN") -or $releaseWorkflow.Contains("NODE_AUTH_TOKEN")) {
+    throw "Release workflow must use npm trusted publishing instead of a long-lived npm token"
 }
 $releaseFinalizer = Get-Content -LiteralPath (Join-Path $root "scripts/finalize-release-assets.ps1") -Raw
 if (-not $releaseFinalizer.Contains("SHA256SUMS")) {
