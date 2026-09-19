@@ -61,8 +61,8 @@ foreach ($required in @(
         throw "Release workflow is missing distribution contract marker: $required"
     }
 }
-if ($releaseWorkflow.Contains("secrets.NPM_TOKEN")) {
-    throw "Release workflow must use npm trusted publishing instead of a long-lived npm token"
+if (-not $releaseWorkflow.Contains('NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}')) {
+    throw "Release workflow must configure the NPM_TOKEN secret for npm publishing"
 }
 $releaseFinalizer = Get-Content -LiteralPath (Join-Path $root "scripts/finalize-release-assets.ps1") -Raw
 if (-not $releaseFinalizer.Contains("SHA256SUMS")) {
