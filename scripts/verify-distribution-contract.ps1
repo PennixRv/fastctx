@@ -66,7 +66,8 @@ if (-not $releaseFinalizer.Contains("SHA256SUMS")) {
 $npmVerifier = Get-Content -LiteralPath (Join-Path $root "scripts/verify-npm-install.ps1") -Raw
 foreach ($required in @(
     'Get-InstalledLauncher $mainPrefix "@pennixrv/fastctx"',
-    'Get-InstalledLauncher $aliasPrefix "@pennixrv/codex-fastctx"'
+    'Get-InstalledLauncher $aliasPrefix "@pennixrv/codex-fastctx"',
+    "captured.package !== '@pennixrv/fastctx'"
 )) {
     if (-not $npmVerifier.Contains($required)) {
         throw "Npm install verifier is missing scoped package path contract: $required"

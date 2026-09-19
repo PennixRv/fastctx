@@ -47,4 +47,4 @@ fastctx guidance remove [--codex-home PATH] [--yes]
 
 ## Release Contract
 
-以 upstream `v0.2.6` package/API 作为基线，Pennix fork 发布修正版 tag `v0.2.10`。Cargo package 的 repository、authors 和 package identity 使用 fork 可追溯信息；npm 发布使用 `@pennixrv/fastctx`、`@pennixrv/codex-fastctx` 和对应 platform 包，不占用官方 unscoped 名称。本 rollout task 的 Bootstrap 必须使用 npm registry 的精确版本，不从本地 build 猜测版本。
+以 upstream `v0.2.6` package/API 作为基线，Pennix fork 发布修正版 tag `v0.2.11`。Cargo package 的 repository、authors 和 package identity 使用 fork 可追溯信息；npm 发布使用 `@pennixrv/fastctx`、`@pennixrv/codex-fastctx` 和对应 platform 包，不占用官方 unscoped 名称。本 rollout task 的 Bootstrap 必须使用 npm registry 的精确版本，不从本地 build 猜测版本。

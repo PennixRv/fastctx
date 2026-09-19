@@ -340,7 +340,7 @@ require(${JSON.stringify(fixtureLauncher)});
       for (const name of ['version', 'package', 'mode', 'node', 'launcher', 'launcherPid', 'handoff']) {
         if (!captured[name]) throw new Error(`${label} omitted ${name}: ${JSON.stringify(captured)}`);
       }
-      if (captured.package !== 'fastctx' || captured.mode !== 'global') {
+      if (captured.package !== '@pennixrv/fastctx' || captured.mode !== 'global') {
         throw new Error(`${label} reported the wrong package or mode: ${JSON.stringify(captured)}`);
       }
       return captured;

@@ -414,7 +414,7 @@ jobs:
         run: |
           notes="$RUNNER_TEMP/fastctx-release-notes.md"
           cat > "$notes" <<'EOF'
-          ## Pennix FastCtx v0.2.10
+          ## Pennix FastCtx v0.2.11
 
           This PennixRv fork publishes the scoped npm package family `@pennixrv/fastctx*`; it never publishes or replaces an upstream npm package name. Normal Apply and TUI installation leave `AGENTS.md` untouched; Pennix keeps its static guidance in its own templates.
 
