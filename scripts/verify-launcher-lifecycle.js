@@ -575,7 +575,7 @@ function assertMissingPlatformPackageUsesStableCopyOrGivesAnActionableExit() {
 function assertUpdateHandoffKeepsLauncherAlive() {
   const workspace = canonicalTempWorkspace('fastctx-handoff-');
   try {
-    const packageRoot = path.join(workspace, 'node_modules', 'fastctx');
+    const packageRoot = path.join(workspace, 'node_modules', '@pennixrv', 'fastctx');
     fs.mkdirSync(packageRoot, { recursive: true });
     const inputLauncher = fs.readFileSync(launcher, 'utf8');
     const isAlias = inputLauncher.includes("require('@pennixrv/fastctx/launcher.js')");
