@@ -397,7 +397,12 @@ jobs:
             if (-not (Test-Path -LiteralPath $tarball -PathType Leaf)) {
               throw "Missing npm package artifact: $($package.File)"
             }
-            $published = (& npm view "$($package.Name)@$version" version --registry https://registry.npmjs.org/ 2>$null).Trim()
+            $published = & npm view "$($package.Name)@$version" version --registry https://registry.npmjs.org/ 2>$null
+            if ($null -eq $published) {
+              $published = ""
+            } else {
+              $published = ($published -join "`n").Trim()
+            }
             if ($LASTEXITCODE -eq 0 -and $published -eq $version) {
               Write-Host "$($package.Name)@$version is already published; keeping the existing immutable version."
               continue
