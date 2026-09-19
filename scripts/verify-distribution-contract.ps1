@@ -63,6 +63,15 @@ $releaseFinalizer = Get-Content -LiteralPath (Join-Path $root "scripts/finalize-
 if (-not $releaseFinalizer.Contains("SHA256SUMS")) {
     throw "Release finalizer must create the single SHA256SUMS asset"
 }
+$npmVerifier = Get-Content -LiteralPath (Join-Path $root "scripts/verify-npm-install.ps1") -Raw
+foreach ($required in @(
+    'Get-InstalledLauncher $mainPrefix "@pennixrv/fastctx"',
+    'Get-InstalledLauncher $aliasPrefix "@pennixrv/codex-fastctx"'
+)) {
+    if (-not $npmVerifier.Contains($required)) {
+        throw "Npm install verifier is missing scoped package path contract: $required"
+    }
+}
 if ($releaseWorkflow.Contains(".sha256")) {
     throw "Release workflow must not create per-asset .sha256 sidecars"
 }

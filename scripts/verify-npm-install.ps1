@@ -149,7 +149,7 @@ try {
 
     npm install --global --prefix $mainPrefix --ignore-scripts --offline --include=optional $localMainTarball
     if ($LASTEXITCODE -ne 0) { throw "isolated main-package npm install failed" }
-    Assert-InstalledPackage $mainPrefix (Get-InstalledLauncher $mainPrefix "fastctx")
+    Assert-InstalledPackage $mainPrefix (Get-InstalledLauncher $mainPrefix "@pennixrv/fastctx")
 
     if ($localAliasTarball) {
         # npm does not install a transitive optional file: tarball from an offline

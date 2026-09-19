@@ -1,6 +1,6 @@
 {
   "name": "@pennixrv/fastctx-darwin-x64",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "FastCtx binary for macOS x64",
   "author": "PennixRv",
   "license": "Apache-2.0",
