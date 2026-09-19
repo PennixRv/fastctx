@@ -231,17 +231,23 @@ function linkOrCopyExecutable(source, target) {
   }
 }
 
+function resolveMainLauncher(inputLauncher) {
+  if (inputLauncher.includes("require('@pennixrv/fastctx/launcher.js')")) {
+    return require.resolve('@pennixrv/fastctx/launcher.js', { paths: [path.dirname(launcher)] });
+  }
+  if (inputLauncher.includes("require('fastctx/launcher.js')")) {
+    return require.resolve('fastctx/launcher.js', { paths: [path.dirname(launcher)] });
+  }
+  return launcher;
+}
+
 function assertNpmInvocationProvenanceAcrossLayouts() {
   const workspace = canonicalTempWorkspace('fastctx-npm-driver-');
   try {
     const target = hostTarget();
     if (!target) return;
     const inputLauncher = fs.readFileSync(launcher, 'utf8');
-    const mainLauncher = inputLauncher.includes("require('@pennixrv/fastctx/launcher.js')")
-      ? require.resolve('@pennixrv/fastctx/launcher.js', { paths: [path.dirname(launcher)] })
-      : inputLauncher.includes("require('fastctx/launcher.js')")
-        ? require.resolve('fastctx/launcher.js', { paths: [path.dirname(launcher)] })
-        : launcher;
+    const mainLauncher = resolveMainLauncher(inputLauncher);
     const detachedNode = path.join(
       workspace,
       'detached-node',
@@ -498,9 +504,7 @@ function assertMissingPlatformPackageUsesStableCopyOrGivesAnActionableExit() {
   const workspace = canonicalTempWorkspace('fastctx-platform-fallback-');
   try {
     const inputLauncher = fs.readFileSync(launcher, 'utf8');
-    const mainLauncher = inputLauncher.includes("require('fastctx/launcher.js')")
-      ? require.resolve('fastctx/launcher.js', { paths: [path.dirname(launcher)] })
-      : launcher;
+    const mainLauncher = resolveMainLauncher(inputLauncher);
     const packageRoot = path.join(workspace, 'node_modules', 'fastctx');
     fs.mkdirSync(packageRoot, { recursive: true });
     const fixtureLauncher = path.join(packageRoot, 'launcher.js');
@@ -575,9 +579,7 @@ function assertUpdateHandoffKeepsLauncherAlive() {
     fs.mkdirSync(packageRoot, { recursive: true });
     const inputLauncher = fs.readFileSync(launcher, 'utf8');
     const isAlias = inputLauncher.includes("require('@pennixrv/fastctx/launcher.js')");
-    const mainLauncher = isAlias
-      ? require.resolve('@pennixrv/fastctx/launcher.js', { paths: [path.dirname(launcher)] })
-      : launcher;
+    const mainLauncher = resolveMainLauncher(inputLauncher);
     const fixtureMainLauncher = path.join(packageRoot, 'launcher.js');
     fs.copyFileSync(mainLauncher, fixtureMainLauncher);
     let fixtureLauncher = fixtureMainLauncher;

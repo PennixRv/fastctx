@@ -8,6 +8,7 @@
 
 - `verify-distribution-contract.ps1` 必须分别读取并检查 `verify-npm-install.ps1` 与 `verify-launcher-lifecycle.js` 的合同。
 - alias npm fixture 必须按 scoped forwarding launcher 解析真实主 launcher，不能把 alias launcher 当作主 launcher 的 fallback fixture。
+- 主 launcher 解析规则必须由共享 helper 提供，避免 provenance、fallback 和 handoff 三个 fixture 分支发生漂移。
 - release notes 必须使用当前 annotated tag 的版本，不得固定写入某个历史版本。
 - 保留 artifact 目录隔离、scoped npm launcher 路径、scoped provenance、alias 依赖和五平台产物合同。
 - 不修改 Rust runtime、MCP 行为、Apply/TUI 行为或用户 `AGENTS.md` 行为。
