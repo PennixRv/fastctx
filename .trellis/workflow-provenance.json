@@ -2,8 +2,8 @@
   "schema_version": 1,
   "workflow_id": "codex-subnode-channel",
   "source_kind": "marketplace",
-  "registry": "gh:PennixRv/marketplace#8f7a3741a107288ffe30a6c6ccc413f68d470c97",
-  "ref": "8f7a3741a107288ffe30a6c6ccc413f68d470c97",
+  "registry": "gh:PennixRv/marketplace#1e0af97b9148ba8104f28577349af41c0b41868c",
+  "ref": "1e0af97b9148ba8104f28577349af41c0b41868c",
   "path": "workflows/codex-subnode-channel/workflow.md",
-  "content_sha256": "d6903f7eda75fca87994b0254579b0f0cc8e19bed924ac732d0c0aa7e508c963"
+  "content_sha256": "70fc0b801d9c686bc21720bc635fae72a97ed8cf9a08b0e3efb837d0323c79ee"
 }

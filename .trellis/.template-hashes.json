@@ -1,7 +1,7 @@
 {
   "__version": 2,
   "hashes": {
-    ".agents/skills/trellis-continue/SKILL.md": "cc70d38de4bf7367624aebbc96417a7f3b9f17618d844d94f9f434503867c8bd",
+    ".agents/skills/trellis-continue/SKILL.md": "1ce1a1a4ddac55b61d3421028b95d61c05deb6ca48991fb0bae7e2dd6eb8feae",
     ".agents/skills/trellis-finish-work/SKILL.md": "11d1bf6e06efb71e5542debec026ffca893692c5c796c2359eef9d166a61b932",
     ".agents/skills/trellis-start/SKILL.md": "7dd6ba73c91a18cc9c3d58947b3f3fa6eaaa0df47e7166165ca7bf4a71fe4594",
     ".agents/skills/trellis-before-dev/SKILL.md": "00c9d1c83bc318e91b27a019bc954c2957cfad907ff20d854b596f16cad2c0f3",
@@ -66,7 +66,7 @@
     ".trellis/scripts/__init__.py": "1242be5b972094c2e141aecbe81a4efd478f6534e3d5e28306374e6a18fcf46c",
     ".trellis/scripts/add_session.py": "f61a452ec5f7eece8d7e0f0dd56ce5851166cbc83ca4822e30acbb36eeb5896f",
     ".trellis/scripts/common/__init__.py": "f258cd873681dc5a4d71db0dd71d10fd78656de55bec96418d6702503c16e87d",
-    ".trellis/scripts/common/active_task.py": "de638758e72cd91af4c3ee5f633893cd5f0c7b847dd57a4ff6cce3aa7729221e",
+    ".trellis/scripts/common/active_task.py": "918217a616ce73aa52f56f458ad0b3d480b9575ccc5d8d847ae16e1860ecf280",
     ".trellis/scripts/common/cli_adapter.py": "803e11bffa01c8d28f06571cdcbc84fb5a4dfb8298cc21ab415ac6894c5f9476",
     ".trellis/scripts/common/config.py": "fa6f851ef5440d0053168d07a95e8356d69400ccf216d1d817bbd7f2e1b5ecc8",
     ".trellis/scripts/common/context_projection.py": "a1699dad6a35c5d8b53110be40d2d5da60b1b561290f83141348f9845497301f",
@@ -76,7 +76,7 @@
     ".trellis/scripts/common/git_context.py": "be0c68d4b566319484cf95a3ca6d6dee18e00f040cecadea6a98f10dc445f967",
     ".trellis/scripts/common/io.py": "5dd8b9e297125ff58543a9bd4790c03ae1aca1d37b9e2ca60c4ffb47601c1cbb",
     ".trellis/scripts/common/log.py": "471df6895cfac80f995edebbf9974f6b7440634b7a688f28b8331c868bc0f3cf",
-    ".trellis/scripts/common/ownership_record.py": "79bb868312e89cbeabd6f136bb9c5f5b5b79a2f8945f2a8db30dd6d3d33d3e2a",
+    ".trellis/scripts/common/ownership_record.py": "a551f1ec28ccc6a91352f4312c1e6a323a96d7e862b8576de943323a536b1cfe",
     ".trellis/scripts/common/packages_context.py": "efe158d7c99c2268851d0216fbb08de22836e418a8dbeb73575b8cc249eed7b7",
     ".trellis/scripts/common/paths.py": "f4ec61e31a4f3840b589181e702caade4e40b6bb428ff87397dcb7337d032cc8",
     ".trellis/scripts/common/safe_commit.py": "8960afb1443bdec343c48650cbcf5f5d66492c55053233526286b54be232c78c",
