@@ -168,9 +168,9 @@ an already-started task, a material recorded change, explicit inspection or
 repair, or a user-requested pause/finish. Do not create one for ordinary edits,
 tests, diffs, compaction, resume, or a subnode event/report. It is never a
 formal-handoff gate, a source-session exit signal, or a replacement for the
-Pennix session-handoff Semantic Handoff Capsule and its explicit AgentMemory
-write and exact project/type/content retrieval-verification step. For a formal
-handoff, the `agentmemory_required` path's authenticated memory-id proof and
+Pennix session-handoff Semantic Handoff Capsule and its explicit Cognee
+write and exact dataset/data/content retrieval-verification step (including the raw content read). For a formal
+handoff, the `cognee_required` path's authenticated dataset/data UUID proof and
 handoff receipt record source convergence; local task artifacts remain
 authoritative. A taskless handoff seals its session boundary without creating
 a task; a task-bearing handoff retains native ownership barriers. The explicit
