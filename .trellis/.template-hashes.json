@@ -13,7 +13,7 @@
     ".agents/skills/trellis-channel/references/forum.md": "407db39e8ebde47cea8637e3069bdb3d76ba42b43ed1d08ba97a56f26dbcfcb4",
     ".agents/skills/trellis-channel/references/progress-debugging.md": "6ef50670061f5e2a7fdd96870074f2545ccd8e5bd41168d1016e27fedf5645cb",
     ".agents/skills/trellis-channel/references/subnode-work.md": "227d747de1f3a1ed5ab86c3456c8ee555b15e34694e9a46d68bdf00dec8be364",
-    ".agents/skills/trellis-channel/references/workers.md": "3c4f09fbabc2037e7503bfa7630c9befc50007531d650d9f348a784e92b444cd",
+    ".agents/skills/trellis-channel/references/workers.md": "d59eb28d0b9bb33dd7075440770684e50055618efa8ddf92f424b0e50c3fe10e",
     ".agents/skills/trellis-channel/references/workflows.md": "a7eaca08d1d3ed7781ff37c4a587a062676759648c7b797a9c07e7b518a3c2b5",
     ".agents/skills/trellis-channel/SKILL.md": "129f21c60bed19351ed0851748cd6d8306402d90c49f2672d3ae84466ea7209f",
     ".agents/skills/trellis-meta/references/customize-local/add-project-local-conventions.md": "86009ccb5d0373f399582da0bc570c4e5c6053c3c764857424ff93384f0e04e5",
@@ -101,6 +101,6 @@
     ".trellis/scripts/common/spec_inject.py": "9987d213eed3d2ec1b2c16adcad8b10a21d3b68dcce838f85c42d83c56e69e0b",
     ".trellis/agents/subnode-profiles.json": "b862bd997cb8874ae0e167ca47abcd315840e6a6102373c3e516e969f14ee8a2",
     ".codex/hooks/inject-spec-context.py": "4df3945be18163afe066ec3061d8b95a687f676e3a80dbf0aada4dec8c339f90",
-    ".trellis/workflow.md": "e898404a915bf7fbda4d6f3014fefa8a6cb81b3dbbc26d4262f880541253d4aa"
+    ".trellis/workflow.md": "4599e2743270da553a25d65509e7a16043b1254e59cb3167afb043315c8ff013"
   }
 }

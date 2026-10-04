@@ -168,14 +168,13 @@ an already-started task, a material recorded change, explicit inspection or
 repair, or a user-requested pause/finish. Do not create one for ordinary edits,
 tests, diffs, compaction, resume, or a subnode event/report. It is never a
 formal-handoff gate, a source-session exit signal, or a replacement for the
-Pennix session-handoff Semantic Handoff Capsule and its explicit Cognee
-write and exact dataset/data/content retrieval-verification step (including the raw content read). For a formal
-handoff, the `cognee_required` path's authenticated dataset/data UUID proof and
-handoff receipt record source convergence; local task artifacts remain
-authoritative. A taskless handoff seals its session boundary without creating
-a task; a task-bearing handoff retains native ownership barriers. The explicit
-`core_only` mode is the offline exception. A RecoveryBrief may be included as
-corroborating task evidence only.
+Pennix session-handoff Semantic Handoff Capsule and its paired JSON/prompt.
+For a formal handoff, the local source boundary and append-only handoff receipt
+record source convergence; local task artifacts remain authoritative. A
+taskless handoff seals its session boundary without creating a task; a
+task-bearing handoff retains native ownership barriers. The `core_only` mode
+is the normal local path. A RecoveryBrief may be included as corroborating task
+evidence only.
 
 ### Independent Evidence
 
