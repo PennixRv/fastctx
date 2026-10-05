@@ -1,0 +1,31 @@
+{
+  "id": "release-credential-residue-closeout",
+  "name": "release-credential-residue-closeout",
+  "title": "Reconcile release credential and existing Trellis records",
+  "description": "Root SiYuan workflow closeout: restore the confirmed GitHub NPM_TOKEN publish contract, review and preserve existing untracked Trellis scaffold and historical research, verify and push scoped main commits without declaring bootstrap complete.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-05",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "delivery_mode": "change_bearing",
+    "planning_scope": "delivery",
+    "execution_class": "lightweight",
+    "implementation_authorized": "true"
+  }
+}
