@@ -75,3 +75,25 @@ Updated FastCtx native Trellis assets and worker-terminal guidance on beta.26; p
 ### Status
 
 [OK] **Completed**
+
+
+## Session 4: Release credential and Trellis record closeout
+<!-- trellis-session: v=2 fp=62d1c2b2e38a1ebc -->
+
+**Date**: 2026-10-05
+**Task**: Release credential and Trellis record closeout
+**Branch**: `main`
+
+### Summary
+
+Preserved GitHub NPM_TOKEN publish contract without runtime or release changes; inspected and committed 13 existing nonsecret Trellis scaffold/history records, preserving incomplete bootstrap and older task states; owner follow-up archived with tracked-path deletions included.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `96b5c9e` | docs: preserve reviewed Trellis records and release contract |
+
+### Status
+
+[OK] **Completed**
