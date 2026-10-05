@@ -16,8 +16,8 @@ Root SiYuan workflow closeout: restore the confirmed GitHub NPM_TOKEN publish co
 - [x] Restored release workflow is byte-identical to HEAD and retains `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`.
 - [x] Existing records are inspected, JSON parses, local document links resolve, and staged differences contain only the declared nonsecret records.
 - [x] Native task validation and `git diff --check` pass with unused context manifests explicitly skipped.
-- [ ] Scoped main commits are pushed, repository is clean, and root acceptance records the resulting source commit.
-- [ ] This owner follow-up is archived correctly without changing older task states.
+- [x] Scoped main commits are pushed, repository is clean, and root acceptance records the resulting source commit.
+- [x] This owner follow-up is archived correctly without changing older task states.
 
 ## Planning Seal
 
@@ -26,3 +26,5 @@ Closed 2026-10-05: lightweight preservation/restoration under existing delivery 
 ## Verification
 
 2026-10-05: all 13 preexisting records were inspected; the one JSON task record parses and nine local Markdown links resolve. The backend documents remain initial scaffolds and bootstrap remains `in_progress`; old task states are preserved. No private-key/npm/GitHub credential pattern was found in these records. Native task validation passed with unused implement/check manifests skipped. The restored workflow has no diff against HEAD, so this closeout changes no publishing behavior or runtime and requires no new package release or installation.
+
+Source record commit `96b5c9e` was pushed to origin/main and the native finish survey reported a clean tree. Root research/11 records that fixed point. Native task archive succeeded with the main/non-PR branch-validation exception and no implicit commit; its move and both old tracked-path deletions are committed together. Bootstrap and the two older delivery tasks remain unchanged.
