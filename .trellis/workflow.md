@@ -160,6 +160,16 @@ child task only when the unit has an independent owner, lifecycle, and acceptanc
 contract. A subnode is an explicit independent-evidence choice, not a way to
 offload every long read.
 
+### Continuation and Compaction
+
+Reuse the current conversation or sufficient compaction checkpoint when root,
+task, phase, authorization and pending action are known. An ordinary continue
+resumes that action without repeated startup, task/Git/history or handoff
+validation. Query only missing/conflicting facts for a fresh session, changed
+target or explicit inspection. Native protected writes retain owner identity
+and ownership checks. Never repeat or re-answer consumed pre-compaction user
+input; handle genuinely new input normally. No recovery cache or extra waiter.
+
 ### Semantic RecoveryBrief
 
 Trellis task artifacts remain the semantic record. The low-level
