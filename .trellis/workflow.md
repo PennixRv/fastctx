@@ -10,7 +10,7 @@
 4. **Artifacts are durable** — the coordinator creates an immutable `brief.json`; the subnode appends its `worklog.md` and writes one pending-review `report.json` under the active task.
 5. **Completion is not acceptance** — the coordinator validates the report, rechecks material sources and protected targets, then records `accepted`, `rejected`, or `deferred` with its reason.
 6. **Channel is the lifecycle surface** — use its native create, spawn, send, and wait protocol. Wait for events rather than high-frequency polling; do not create a second waiter, use terminal JSON as the report, or add automatic retry/scheduling.
-7. **Evidence is unit-sized** — split read-heavy main-session or subnode work into independently useful evidence units when one bounded session cannot persist a conclusion. Each unit records its scope, minimal evidence, destination, stop condition, conclusion or blocker, unknowns, and recovery point before the next unit.
+7. **Evidence is unit-sized** — persist the unit-to-point mapping in the task's plan or matrix. Size by complexity, work, and evidence range. Combine points only when each is quick/simple and they are obviously related with shared context and a bounded total workload; preserve separate evidence/conclusions. Owner domains and slot counts do not determine unit count. New brief/queue admission requires a task-owned `unit_plan`; its structural gate cannot prove semantic coverage.
 
 ### Subnode Evidence Profiles
 
@@ -97,10 +97,13 @@ retried. A new attempt requires a new brief and subnode ID.
 The main session fills available guard capacity in queue order, then uses one
 native Channel waiter after a durable barrier. Terminal release of a physical
 slot does not itself authorize a replacement. Before every replacement, the
-coordinator rechecks every dispatched item: only a native terminal event,
-complete report with no validator concerns, matching source and protected
-target recheck, and a single written `accepted` disposition authorize the next
-FIFO item. `blocked`, `incomplete`, `rejected`, validator concern, capacity
+coordinator checks dispatched items for failure, conflict, and unresolved
+terminal state. A healthy still-running worker need not finish. For the released
+unit, a native terminal event, complete report without validator concerns,
+source/protected-target recheck, and a create-once `accepted` disposition plus
+verified native capacity authorize the next unclaimed FIFO item immediately.
+Do not wait for a whole batch with `--all` before ordinary refill.
+`blocked`, `incomplete`, `rejected`, validator concern, capacity
 rejection, missing event, conflicting receipt, or an unresolvable reservation
 pauses the whole queue.
 
@@ -108,7 +111,8 @@ On interruption or resume, reconstruct state from the original Channel events,
 claims, live PID/reservation, reports, and dispositions. An existing claim or
 attempt is never re-dispatched merely because its process is gone. The
 coordinator continues only with items that have no attempt facts and only when
-all earlier items are accepted. The main session must remain present; this is
+the attempted prefix is reconciled and each replacement has accepted-slot
+credit; healthy live predecessors do not block a refill. The main session must remain present; this is
 not a background scheduler. To stop permanently, write one abandonment marker
 and partition every queued ID between persisted dispatch claims and the
 remaining unclaimed items. A claim counts as an attempted dispatch even if the
@@ -126,9 +130,46 @@ edit queue items. A different order requires a new work ID. Waiting uses the
 existing durable barrier/`afterSeq` path; high-frequency polling, a second
 waiter, automatic retry, and a resident scheduler remain prohibited.
 
+Read `trellis-channel`'s `references/multi-target-dispatch.md` for the stable
+one-host multi-target procedure. Initial fill uses all actual available guard
+slots in FIFO order; record any necessary resource/dependency exception.
+Coalesce eligible init/spawn/send actions into one native host invocation with
+per-target receipts and fail-stop handling. Multiple host tool calls inside one
+orchestration cell are still multiple calls. The native helper enforces the
+earliest unclaimed item; it does not mirror worker state or schedule replacements.
+
 This workflow assumes Codex's default `codex.dispatch_mode: inline`. Do not
 select `auto` or `sub-agent` for this workflow: those modes seed native-agent
-context and belong to the Native Trellis Workflow instead.
+context and belong to the Native Trellis Workflow instead. Inline mode does
+not prohibit explicit Channel evidence. Required independent evidence cannot
+be replaced by unsupported main-session pass claims.
+
+## Plan Approval And Task Selection
+
+Classify task meta explicitly: `execution_class=direct|planned` and
+`delivery_mode=change_bearing|analysis_only`. For planned/change-bearing work,
+close decisions and required artifacts, run native `task.py plan seal <task>`,
+present the current material plan, and stop before implementation. Only a later
+explicit approval for this task's current sealed revision authorizes native
+`task.py plan approve <task> --revision <n> --basis "<actual non-sensitive approval>"`,
+then start. Initial delivery requests, parent-task approval, and design answers
+do not qualify. The manifest override never bypasses approval. The native
+record checks structure; chat authenticity remains coordinator-owned.
+
+Material scope, owner, risk, public behavior, or acceptance changes require
+native replan, a new seal, presentation, and later approval. Resealing a sealed
+planning task declares a new material revision; wording/formatting/progress
+notes do not automatically invalidate it. Old unclassified planning tasks need
+classification once; existing in-progress tasks are not reset. Direct small
+work and eligible analysis-only work keep their existing shortest paths.
+
+Use native `task.py select <task>` for context only, preserving phase and branch
+without after_start hooks or implementation authority. `create --no-start`
+keeps the prior pointer. Save the old checkpoint; with live Channel work, pause
+refills and drain all already dispatched nodes and reservations via
+`trellis-channel`'s multi-target procedure, preserving unclaimed work and the
+old phase. Do not automatically kill/retry or restart a user-stopped task.
+Ordinary continue/compaction retains its checkpoint fast path.
 
 ## Trellis System
 
@@ -254,11 +295,13 @@ Multiple developer-owned tasks have no direct session binding. Inspect native `t
 [/workflow-state:unbound_ambiguous-inline]
 
 [workflow-state:planning]
+Planned/change-bearing start requires native plan seal and matching later approval for this task's current material revision; select only binds context.
 Only if `task.json.meta.delivery_mode = "analysis_only"` exactly and its PRD satisfies the bounded evidence-only eligibility rule, stay in planning: complete and verify the bounded evidence, preserve the protected-target no-change boundary, commit task artifacts, and archive without running `task.py start`.
 For a change-bearing task, stay in planning until the required artifacts are complete, the Planning Seal is closed, and the user approves implementation. Then the main session runs the native `python3 ./.trellis/scripts/task.py start <task-dir>` to enter `in_progress`; do not implement while status is `planning`. The main session performs ordinary work directly. A subnode is allowed only for a user-requested independent-evidence question with a frozen brief and durable task artifact path; report status is never acceptance.
 [/workflow-state:planning]
 
 [workflow-state:planning-inline]
+Planned/change-bearing start requires native plan seal and matching later approval for this task's current material revision; select only binds context.
 Only if `task.json.meta.delivery_mode = "analysis_only"` exactly and its PRD satisfies the bounded evidence-only eligibility rule, stay in planning: complete and verify the bounded evidence, preserve the protected-target no-change boundary, commit task artifacts, and archive without running `task.py start`.
 For a change-bearing task, stay in planning until the required artifacts are complete, the Planning Seal is closed, and the user approves implementation. Then the main session runs the native `python3 ./.trellis/scripts/task.py start <task-dir>` to enter `in_progress`; do not implement while status is `planning`. The main session performs ordinary work directly. A subnode is allowed only for a user-requested independent-evidence question with a frozen brief and durable task artifact path; report status is never acceptance.
 [/workflow-state:planning-inline]
