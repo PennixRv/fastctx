@@ -97,3 +97,25 @@ Preserved GitHub NPM_TOKEN publish contract without runtime or release changes; 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 5: Verified blocking interaction and checkpoint rollout
+<!-- trellis-session: v=2 fp=58df1e02711fcb35 -->
+
+**Date**: 2026-10-06
+**Task**: Verified blocking interaction and checkpoint rollout
+**Branch**: `main`
+
+### Summary
+
+Consumed Trellis beta.32 and preserved native ownership, project configuration and history; verified selected workflow, current continuation/grill assets and clean landing. This session task archived; unrelated prior tasks preserved.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8bb48da` | chore: consume verified Trellis beta.32 interaction assets |
+
+### Status
+
+[OK] **Completed**
