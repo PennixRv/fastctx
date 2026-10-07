@@ -103,9 +103,13 @@ unit, a native terminal event, complete report without validator concerns,
 source/protected-target recheck, and a create-once `accepted` disposition plus
 verified native capacity authorize the next unclaimed FIFO item immediately.
 Do not wait for a whole batch with `--all` before ordinary refill.
-`blocked`, `incomplete`, `rejected`, validator concern, capacity
-rejection, missing event, conflicting receipt, or an unresolvable reservation
-pauses the whole queue.
+Local report delivery/validation failures isolate the affected unit. Preserve
+its attempt and rejected/deferred evidence; it supplies no accepted-slot credit.
+Other independently accepted units still authorize FIFO refill while healthy
+workers run. Identity, source/protected-target, permission/security or capacity
+conflicts, missing terminal evidence, conflicting receipts and unresolvable
+reservations pause global admission until reconciled. Do not convert a local
+failure into either acceptance or a global retry-only interval.
 
 On interruption or resume, reconstruct state from the original Channel events,
 claims, live PID/reservation, reports, and dispositions. An existing claim or
@@ -158,8 +162,10 @@ record checks structure; chat authenticity remains coordinator-owned.
 
 Material scope, owner, risk, public behavior, or acceptance changes require
 native replan, a new seal, presentation, and later approval. Resealing a sealed
-planning task declares a new material revision; wording/formatting/progress
-notes do not automatically invalidate it. Old unclassified planning tasks need
+planning task declares a new material revision. Sealed plan documents are
+byte-frozen and checked by content digest; keep progress and non-material
+corrections in unsealed execution records. A changed plan must be resealed and
+approved before start. Old unclassified planning tasks need
 classification once; existing in-progress tasks are not reset. Direct small
 work and eligible analysis-only work keep their existing shortest paths.
 
@@ -210,22 +216,6 @@ validation. Query only missing/conflicting facts for a fresh session, changed
 target or explicit inspection. Native protected writes retain owner identity
 and ownership checks. Never repeat or re-answer consumed pre-compaction user
 input; handle genuinely new input normally. No recovery cache or extra waiter.
-
-### Semantic RecoveryBrief
-
-Trellis task artifacts remain the semantic record. The low-level
-`ctx_recovery_brief` provider is an optional task-local evidence projection for
-an already-started task, a material recorded change, explicit inspection or
-repair, or a user-requested pause/finish. Do not create one for ordinary edits,
-tests, diffs, compaction, resume, or a subnode event/report. It is never a
-formal-handoff gate, a source-session exit signal, or a replacement for the
-Pennix session-handoff Semantic Handoff Capsule and its paired JSON/prompt.
-For a formal handoff, the local source boundary and append-only handoff receipt
-record source convergence; local task artifacts remain authoritative. A
-taskless handoff seals its session boundary without creating a task; a
-task-bearing handoff retains native ownership barriers. The `core_only` mode
-is the normal local path. A RecoveryBrief may be included as corroborating task
-evidence only.
 
 ### Independent Evidence
 
