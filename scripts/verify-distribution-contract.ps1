@@ -8,10 +8,10 @@ if ($LASTEXITCODE -ne 0) {
 $privatePaths = @(
     $tracked |
         Where-Object {
-            $_ -match '^DESIGN(?:-[^/]+)?\.md$' -or
-            $_ -match '(^|/)(AGENTS|CLAUDE)\.md$' -or
-            $_ -match '^\.sisyphus/' -or
-            $_ -match '^dev-notes/'
+            $_ -cmatch '^DESIGN(?:-[^/]+)?\.md$' -or
+            $_ -cmatch '(^|/)(AGENTS|CLAUDE)\.md$' -or
+            $_ -cmatch '^\.sisyphus/' -or
+            $_ -cmatch '^dev-notes/'
         }
 )
 if ($privatePaths.Count -ne 0) {
