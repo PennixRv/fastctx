@@ -250,11 +250,10 @@ Phase 3: Finish  -> verify, retain conclusions, update specs, commit, and wrap u
 ### Request Triage
 
 - Direct small work: for a clearly bounded, single-surface operation with an immediate verification path, proceed in the main session without a Trellis task or subnode. Apply normal safety rules. If discovery expands the scope or reveals a design, ownership, release, or durable-record need, stop and create a task before continuing.
-- `analysis_only` is eligible only when `task.json.meta.delivery_mode = "analysis_only"` exactly and the PRD defines a bounded evidence deliverable plus a no-change boundary for product source, runtime configuration, deployment, credentials, and external systems. Complex research, cross-owner coordination, design, release, credential, or material-decision work is not eligible for this route.
-- An eligible `analysis_only` task stays in `planning`: complete and verify its evidence, commit task artifacts, and archive directly. Do not start implementation. A protected-target recommendation requires a separate change-bearing task.
-- Complex work: create a task after approval, then complete planning before implementation.
-- Task-creation approval is not implementation approval.
-- Do not create a subnode merely because work is broad or inconvenient. State the independent question, reason, evidence method, scope, and stop condition first; use the main session when independent evidence adds no decision value.
+- `analysis_only` is eligible when `task.json.meta.delivery_mode = "analysis_only"` exactly and the PRD defines bounded evidence plus a no-change boundary for product source, runtime configuration, deployment, credentials, and external systems. Complexity, cross-owner scope, multiple units, recommendations, and unresolved product choices do not make it ineligible; the requested main-session research is already authorized.
+- Keep `analysis_only` in `planning`: complete and verify the evidence, commit task artifacts, and archive directly without implementation approval, Planning Seal, or `task.py start`. A protected-target recommendation requires a separate change-bearing task.
+- Change-bearing work completes planning before implementation and retains its separate approval gate.
+- Do not create a subnode merely because work is broad or inconvenient. State the independent question, reason, evidence method, scope, and stop condition first; use the main session when independent evidence adds no decision value. Before any requested subnode spawn/send, freeze the unit mapping and dispatch plan in task artifacts and obtain explicit user approval; this authorizes only the listed evidence dispatch.
 
 ### Planning Artifacts
 
@@ -286,14 +285,12 @@ Multiple developer-owned tasks have no direct session binding. Inspect native `t
 
 [workflow-state:planning]
 Planned/change-bearing start requires native plan seal and matching later approval for this task's current material revision; select only binds context.
-Only if `task.json.meta.delivery_mode = "analysis_only"` exactly and its PRD satisfies the bounded evidence-only eligibility rule, stay in planning: complete and verify the bounded evidence, preserve the protected-target no-change boundary, commit task artifacts, and archive without running `task.py start`.
-For a change-bearing task, stay in planning until the required artifacts are complete, the Planning Seal is closed, and the user approves implementation. Then the main session runs the native `python3 ./.trellis/scripts/task.py start <task-dir>` to enter `in_progress`; do not implement while status is `planning`. The main session performs ordinary work directly. A subnode is allowed only for a user-requested independent-evidence question with a frozen brief and durable task artifact path; report status is never acceptance.
+For `task.json.meta.delivery_mode = "analysis_only"`, stay in planning: complete and verify evidence regardless of complexity or cross-owner scope, preserve the protected-target no-change boundary, commit task artifacts, and archive without running `task.py start`, a Planning Seal, or implementation approval. Before any requested subnode spawn/send, freeze the dispatch plan in task artifacts and obtain explicit user approval; it authorizes only the listed evidence work. For change-bearing tasks, stay in planning until required artifacts are complete, the Planning Seal is closed, and the user approves implementation; then the main session runs the native `python3 ./.trellis/scripts/task.py start <task-dir>` before implementation. The main session performs ordinary work directly; report status is never acceptance.
 [/workflow-state:planning]
 
 [workflow-state:planning-inline]
 Planned/change-bearing start requires native plan seal and matching later approval for this task's current material revision; select only binds context.
-Only if `task.json.meta.delivery_mode = "analysis_only"` exactly and its PRD satisfies the bounded evidence-only eligibility rule, stay in planning: complete and verify the bounded evidence, preserve the protected-target no-change boundary, commit task artifacts, and archive without running `task.py start`.
-For a change-bearing task, stay in planning until the required artifacts are complete, the Planning Seal is closed, and the user approves implementation. Then the main session runs the native `python3 ./.trellis/scripts/task.py start <task-dir>` to enter `in_progress`; do not implement while status is `planning`. The main session performs ordinary work directly. A subnode is allowed only for a user-requested independent-evidence question with a frozen brief and durable task artifact path; report status is never acceptance.
+For `task.json.meta.delivery_mode = "analysis_only"`, stay in planning: complete and verify evidence regardless of complexity or cross-owner scope, preserve the protected-target no-change boundary, commit task artifacts, and archive without running `task.py start`, a Planning Seal, or implementation approval. Before any requested subnode spawn/send, freeze the dispatch plan in task artifacts and obtain explicit user approval; it authorizes only the listed evidence work. For change-bearing tasks, stay in planning until required artifacts are complete, the Planning Seal is closed, and the user approves implementation; then the main session runs the native `python3 ./.trellis/scripts/task.py start <task-dir>` before implementation. The main session performs ordinary work directly; report status is never acceptance.
 [/workflow-state:planning-inline]
 
 [workflow-state:in_progress]
@@ -320,29 +317,27 @@ permission to implement.
 
 #### 1.1 Requirements And Design `[required · repeatable]`
 
-Write `prd.md`; add `design.md` and `implement.md` when the task is complex.
+Write `prd.md`; bounded `analysis_only` research needs no design or implementation plan solely due to complexity. Add `design.md` and `implement.md` for complex change-bearing work.
 Resolve only unknowns that can change scope, risk, modification path, or
 acceptance. Keep alternatives as alternatives until the user selects one or
 evidence justifies a decision. After each answer, persist the decision,
 recalculate the planning frontier, and continue the same planning loop. Do not
 close the turn merely because a question was answered.
 
-Before the final planning summary, run one Planning Seal closure pass. Reconcile
-task metadata, PRD, design, implementation plan, research, decision records, and
-manifests; lock actual targets and branches, dependencies, release, validation,
-rollback, dynamic-fact dispositions, replan triggers, and every material decision
-to an owner and outcome. No static `TBD`, `TODO`, `decision-needed`, unowned
-option, unspecified branch, open implementation path, validation gap, or
-conditional acceptance may remain. A material discovery returns the task to
-planning and invalidates the seal.
+For change-bearing work, run the Planning Seal closure pass before implementation review. Reconcile task metadata and artifacts, targets, branches, dependencies, release, validation, rollback, dynamic facts, and implementation decisions; material discoveries return the task to planning and invalidate the seal. `analysis_only` evidence work does not require a Planning Seal or a sealed implementation choice.
 
 #### 1.2 Research `[optional · repeatable]`
 
 Perform ordinary local and external research in the main session and write
-material findings to `research/`. When the user expressly needs independent
-evidence, define one narrow `subnode` brief and use the installed
-`trellis-channel` reference. Preserve both the report and the coordinator's
-later decision; do not substitute a Channel message for either record.
+material findings to `research/`; the initial research request authorizes this
+work. If the user expressly requests independent evidence, first freeze the
+research question, unit-to-scope mapping and grouping rationale, each brief's
+scope/stop condition/destination, parallel and FIFO acceptance method, and
+report paths in a task artifact. Present that plan and obtain explicit user
+approval before any spawn/send. Approval covers only the named evidence briefs;
+material plan changes require reapproval, while the main session may continue
+its evidence work. Use the installed `trellis-channel` reference and preserve
+the report and coordinator's later decision as separate records.
 
 #### 1.3 Prepare Execution `[required · once]`
 
@@ -364,13 +359,12 @@ without start.
 
 #### 1.5 Completion Criteria
 
-Before Phase 2, ensure that the modification target, acceptance criteria,
-validation commands, and known risks are explicit. For a planned subnode,
-ensure the question is independent and bounded rather than a proxy for normal
-implementation or review. The planning seal must close every static
-implementation choice: no `TBD`, `TODO`, `decision-needed`, unowned option,
-unspecified branch, open implementation path, validation gap, or conditional
-acceptance point may remain.
+Before Phase 2, change-bearing work must have explicit targets, acceptance,
+validation and risks; its Planning Seal closes implementation choices. An
+`analysis_only` task instead needs a bounded evidence deliverable and protected-
+target no-change boundary, and stays in planning through completion. A planned
+subnode must be independently useful, bounded, and covered by a user-approved
+frozen dispatch plan before spawn/send.
 
 ---
 

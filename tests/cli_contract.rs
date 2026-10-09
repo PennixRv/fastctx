@@ -278,6 +278,63 @@ fn apply_status_and_unapply_cover_both_shell_states() {
 }
 
 #[test]
+fn status_accepts_equivalent_timeout_numbers_and_rejects_real_drift() {
+    let temp = tempfile::tempdir().unwrap();
+    write_shell_settings(temp.path(), false);
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["apply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    let path = temp.path().join(".codex/config.toml");
+    let original = std::fs::read_to_string(&path).unwrap();
+    for (startup, tool, drift_key) in [
+        ("120.0", "300.0", None),
+        ("120", "300", None),
+        ("120.5", "300.0", Some("startup_timeout_sec")),
+        ("120.0", "300.5", Some("tool_timeout_sec")),
+        ("\"120\"", "300.0", Some("startup_timeout_sec")),
+        ("nan", "300.0", Some("startup_timeout_sec")),
+        ("120.0", "inf", Some("tool_timeout_sec")),
+    ] {
+        let config = original
+            .replace(
+                "startup_timeout_sec = 120",
+                &format!("startup_timeout_sec = {startup}"),
+            )
+            .replace(
+                "tool_timeout_sec = 300",
+                &format!("tool_timeout_sec = {tool}"),
+            );
+        std::fs::write(&path, config).unwrap();
+        let output = isolated_command(temp.path())
+            .arg("status")
+            .output()
+            .unwrap();
+        let status = String::from_utf8_lossy(&output.stdout);
+        if let Some(key) = drift_key {
+            assert!(!output.status.success(), "{startup}/{tool}: {status}");
+            assert!(status.contains("[FAIL] Applied state"), "{status}");
+            assert!(
+                status.contains(&format!("mcp_servers.fastctx.{key}")),
+                "{status}"
+            );
+        } else {
+            assert_success(&output);
+            assert!(status.contains("[PASS] Applied state"), "{status}");
+        }
+    }
+    std::fs::write(path, original).unwrap();
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["unapply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+}
+
+#[test]
 fn guidance_can_be_disabled_managed_separately_and_never_removes_pennix_content() {
     let temp = tempfile::tempdir().unwrap();
     let codex = temp.path().join(".codex");

@@ -1,18 +1,18 @@
 {
   "__version": 2,
   "hashes": {
-    ".agents/skills/trellis-continue/SKILL.md": "4fd43ad482ed0d87364825547f073773eb9365e2df71aee3412c6f17e996c5ca",
+    ".agents/skills/trellis-continue/SKILL.md": "25a38dafdcbea927cc9aceeb657a39be441c718e0fed41f77440fa4828a511ee",
     ".agents/skills/trellis-finish-work/SKILL.md": "11d1bf6e06efb71e5542debec026ffca893692c5c796c2359eef9d166a61b932",
     ".agents/skills/trellis-start/SKILL.md": "c600952e768f6d72a64aad08ddb044b2120707d7342cae0abe5df392155d9708",
     ".agents/skills/trellis-before-dev/SKILL.md": "00c9d1c83bc318e91b27a019bc954c2957cfad907ff20d854b596f16cad2c0f3",
-    ".agents/skills/trellis-brainstorm/SKILL.md": "f9ba5b94c8232831d7b0f585af1d4fa163ab8c1a9a27b199e690ea114aa3758b",
+    ".agents/skills/trellis-brainstorm/SKILL.md": "54a40e953bfcb364f747cd9c0c6d37dfdf47b5c8665d9817bbb5434d7cf8db92",
     ".agents/skills/trellis-break-loop/SKILL.md": "827bdecb0422c8ff6301e6f4e728cf374ea625e5d211e1a31c6f48d758b1e814",
     ".agents/skills/trellis-check/SKILL.md": "dfb0600e95c19c7a83200465b6a92a5514ec9778ba4083efa881bed541cc74a8",
     ".agents/skills/trellis-update-spec/SKILL.md": "003ce08a3404aeb50998029392c4d4e57b626edf526d3ebd585032bb92dcbb96",
     ".agents/skills/trellis-channel/references/command-reference.md": "35c3e0c7e11660ac0e25ae8debb727d5439a35f71b79eef4a3982ad5c9836229",
     ".agents/skills/trellis-channel/references/forum.md": "9ab0491262aeb1db34d42aa065115689a41b7becea093de2c4ec12a8d8a3deda",
     ".agents/skills/trellis-channel/references/progress-debugging.md": "78f9771b281056fc9ed17ca889404caab66afb4b89d624bb6346f5e82a06b52a",
-    ".agents/skills/trellis-channel/references/subnode-work.md": "66f5f41feba046513a6bcfce23e4481cfefa86a2f0a53eeeaef9b7f18b943350",
+    ".agents/skills/trellis-channel/references/subnode-work.md": "ba900fcb3d7054bcdb65bbeefa1731e9c73c8f6d95d7d6c2832b0d94e8c5f95f",
     ".agents/skills/trellis-channel/references/workers.md": "4785c3ec1a19c078b05ea6f47610e020b3dc6e0b4aeac3cf4ae81c41ab1d5e26",
     ".agents/skills/trellis-channel/references/workflows.md": "fd5448d502b2d596ebd85e5453d227767326c168eeeac6056f6fa22b7831cfd1",
     ".agents/skills/trellis-channel/SKILL.md": "a6f602aa5c0e57ec0638bc9c99bfcf7c9a3608b0b3364ac4782dfe91e4351f64",
@@ -102,7 +102,6 @@
     ".trellis/agents/subnode-profiles.json": "b862bd997cb8874ae0e167ca47abcd315840e6a6102373c3e516e969f14ee8a2",
     ".codex/hooks/inject-spec-context.py": "4df3945be18163afe066ec3061d8b95a687f676e3a80dbf0aada4dec8c339f90",
     ".trellis/scripts/common/task_planning.py": "77430decb7376ce8e44e5ec221b10db5192e30a53b2d1a09765eec865038b4be",
-    ".agents/skills/trellis-channel/references/multi-target-dispatch.md": "c0af7be463eff286fb8ba0a51ed50409673d9ab71338203b32d44ec72cecbbbd",
-    ".trellis/workflow.md": "d9305369ffe3eb67b878649ac40861942bb31381c3fb8d338870c8031b5a5dc1"
+    ".agents/skills/trellis-channel/references/multi-target-dispatch.md": "c0af7be463eff286fb8ba0a51ed50409673d9ab71338203b32d44ec72cecbbbd"
   }
 }

@@ -1,0 +1,53 @@
+{
+  "id": "timeout-numeric-representation",
+  "name": "timeout-numeric-representation",
+  "title": "Accept equivalent numeric MCP timeout representations",
+  "description": "Fix receipt drift false positives for exact equivalent TOML float timeouts, publish 0.2.22, update local project assets and verify native delivery.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-09",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1,
+      "seal": {
+        "revision": 1,
+        "task_id": "timeout-numeric-representation",
+        "task_name": "10-09-timeout-numeric-representation",
+        "documents": [
+          "prd.md",
+          "design.md",
+          "implement.md"
+        ],
+        "document_digests": {
+          "prd.md": "a97aff9e51b81f0562f75c2bb35f28498a30e9320982bc180d8ac637f460bc14",
+          "design.md": "05d3edf2654b8c03294ab7ab98ef7ced1312791a8ade44ccc351e28b107f4783",
+          "implement.md": "4515e81b9be47312444548bf090f6baa8889772a17f204bc11f6be1410f86af7"
+        },
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "sealed_at": "2026-10-09T00:48:35.512615+00:00"
+      },
+      "approved_revision": 1,
+      "approval_basis": "本轮用户直接批准所有已发现落点问题持续修复发布安装，范围与已封口根对齐方案一致。",
+      "approved_at": "2026-10-09T00:48:35.609377+00:00"
+    }
+  }
+}

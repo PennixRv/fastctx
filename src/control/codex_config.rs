@@ -284,6 +284,16 @@ pub fn drift_applied(
     )
 }
 
+fn timeout_matches(item: Option<&Item>, expected: i64) -> bool {
+    // Codex may serialize the same managed timeout as a TOML float.
+    item.is_some_and(|item| {
+        item.as_integer() == Some(expected)
+            || item
+                .as_float()
+                .is_some_and(|value| value == expected as f64)
+    })
+}
+
 fn drift_with_limits(
     original: &[u8],
     expected: &ExpectedConfig,
@@ -303,14 +313,11 @@ fn drift_with_limits(
             if table.get("command").and_then(Item::as_str) != Some(expected.command.as_str()) {
                 drift.push("mcp_servers.fastctx.command".to_string());
             }
-            if table.get("startup_timeout_sec").and_then(Item::as_integer)
-                != Some(STARTUP_TIMEOUT_SECONDS)
-            {
+            if !timeout_matches(table.get("startup_timeout_sec"), STARTUP_TIMEOUT_SECONDS) {
                 drift.push("mcp_servers.fastctx.startup_timeout_sec".to_string());
             }
             if let Some(tool_timeout_sec) = tool_timeout_sec
-                && table.get("tool_timeout_sec").and_then(Item::as_integer)
-                    != Some(tool_timeout_sec)
+                && !timeout_matches(table.get("tool_timeout_sec"), tool_timeout_sec)
             {
                 drift.push("mcp_servers.fastctx.tool_timeout_sec".to_string());
             }
