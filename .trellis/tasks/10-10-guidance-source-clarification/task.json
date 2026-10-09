@@ -1,0 +1,29 @@
+{
+  "id": "guidance-source-clarification",
+  "name": "guidance-source-clarification",
+  "title": "明确FastCtx文档的部署入口与用户规则来源",
+  "description": "对应根任务consumer-update-agents-recheck已批准修订包；仅澄清README中pennix-skills模板来源与pennix-workflow-lifecycle部署入口，不改变运行时或发布二进制。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-10",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "direct",
+    "delivery_mode": "change_bearing"
+  }
+}

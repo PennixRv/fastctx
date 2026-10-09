@@ -12,7 +12,7 @@ Each `fastctx serve` process is a thin stdio proxy. Proxies for the same user an
 
 An MCP session ends when its host ends it, never because the shared runtime had a problem. If the control center becomes unreachable, the proxy answers the calls it can no longer complete with an explicit error, reconnects to a replacement — starting one, or running the engine inside the proxy itself — and carries on over the same stdio transport. Side-effecting calls are never replayed. The control center itself stays resident while any host process that used it is still running, and exits ten minutes after the last of them is gone, with no connection, no active request, and no running background job.
 
-This Pennix fork is distributed as scoped npm packages and matching GitHub Release assets from [`PennixRv/fastctx`](https://github.com/PennixRv/fastctx). Pennix Bootstrap installs the exact catalog-approved npm version, previews the Codex changes, and applies them explicitly. The normal Apply and TUI paths leave `AGENTS.md` untouched; Pennix owns its static guidance templates.
+This fork is distributed as scoped npm packages and matching GitHub Release assets from [`PennixRv/fastctx`](https://github.com/PennixRv/fastctx). The `pennix-workflow-lifecycle` Skill installs the exact catalog-approved npm version, previews the Codex changes, and applies them explicitly. The normal Apply and TUI paths leave `AGENTS.md` untouched; [`PennixRv/pennix-skills`](https://github.com/PennixRv/pennix-skills) maintains the user instruction template at `skills/pennix-workflow-lifecycle/templates/AGENTS.md.install`.
 
 FastCtx currently provides first-class setup for ChatGPT App and Codex CLI. Any MCP client can also register `fastctx serve` directly.
 
@@ -36,9 +36,9 @@ This greatly reduces the attention the model spends on tool mechanics, such as c
 
 ## Installation
 
-### Install with the Pennix setup Skill
+### Install with pennix-workflow-lifecycle
 
-The supported path is the Pennix Bootstrap npm installation. It installs the scoped `@pennixrv/fastctx` package at the catalog-approved version, then invokes `fastctx apply --guidance none` through a preview and explicit confirmation. This fork never publishes, installs, or updates the upstream `fastctx` npm package.
+The supported deployment entry is the `pennix-workflow-lifecycle` Skill in `PennixRv/pennix-skills`. It installs the scoped `@pennixrv/fastctx` package at the catalog-approved version, then invokes `fastctx apply --guidance none` through a preview and explicit confirmation. This fork never publishes, installs, or updates the upstream `fastctx` npm package.
 
 The first launch opens the full-screen control terminal. The interface supports 17 languages and provides these main actions:
 
