@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 6
-- **Last Active**: 2026-10-09
+- **Total Sessions**: 7
+- **Last Active**: 2026-10-10
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~145 | Active |
+| `journal-1.md` | ~167 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 7 | 2026-10-10 | Clarify FastCtx guidance sources | `e05da37` | `main` |
 | 6 | 2026-10-09 | FastCtx footprint reconciliation delivered | `396f643`, `5a67b3c`, `c4eb0d5` | `main` |
 | 5 | 2026-10-06 | Verified blocking interaction and checkpoint rollout | `8bb48da` | `main` |
 | 4 | 2026-10-05 | Release credential and Trellis record closeout | `96b5c9e` | `main` |

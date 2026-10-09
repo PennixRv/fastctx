@@ -143,3 +143,25 @@ Closed equivalent numeric timeout drift and case-sensitive distribution validati
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: Clarify FastCtx guidance sources
+<!-- trellis-session: v=2 fp=601828dc37367561 -->
+
+**Date**: 2026-10-10
+**Task**: Clarify FastCtx guidance sources
+**Branch**: `main`
+
+### Summary
+
+Named the lifecycle deployment Skill and exact pennix-skills user template in both READMEs; documentation-only checks passed; no runtime release.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e05da37` | docs: clarify deployment and user guidance sources |
+
+### Status
+
+[OK] **Completed**
