@@ -334,9 +334,11 @@ pub(crate) fn synchronize_applied_guidance(
         agents::ManagedSectionState::Current => Ok(AppliedGuidanceSync::ApplyRequired(
             agents::ManagedSectionState::Current,
         )),
-        agents::ManagedSectionState::KnownLegacy if record.agents_contract_id.is_some() => {
-            // Released legacy receipts predate this field. Any stamped receipt paired with legacy
-            // bytes is post-Apply drift, so preserve it and keep the required action visible.
+        agents::ManagedSectionState::KnownLegacy
+            if record.agents_contract_id.is_some()
+                || agents::has_exact_v4_section(&original, record.fastshell_enabled) =>
+        {
+            // Stamped legacy guidance requires explicit acceptance of the new contract.
             Ok(AppliedGuidanceSync::ApplyRequired(
                 agents::ManagedSectionState::KnownLegacy,
             ))
@@ -398,8 +400,6 @@ pub fn plan_apply(paths: &ControlPaths, options: ApplyOptions) -> Result<ApplyPl
         tool_budgets: effective_output.tool_budgets,
         fastshell_enabled: options.fastshell_enabled,
     };
-    let codex_edit = codex_config::apply(codex_source, &expected)?;
-
     let installed_original = if same_path(&options.current_executable, &paths.installed_binary) {
         Some(source_binary.clone())
     } else {
@@ -425,8 +425,20 @@ pub fn plan_apply(paths: &ControlPaths, options: ApplyOptions) -> Result<ApplyPl
         .applied
         .clone()
         .filter(|record| record.targets_codex_profile(paths));
+    let codex_source = without_receipted_direct_only_namespace(
+        paths,
+        codex_source,
+        previous_applied.as_ref(),
+        installed_original.as_deref(),
+    )?;
+    let codex_edit = codex_config::apply(&codex_source, &expected)?;
     let guidance = if options.guidance == GuidanceMode::Managed {
         let original = transaction::read_snapshot(&paths.codex_agents)?;
+        validate_v4_guidance_receipt(
+            paths,
+            previous_applied.as_ref(),
+            original.as_deref().unwrap_or_default(),
+        )?;
         let edit = agents::apply_section_with_ownership_for(
             original.as_deref().unwrap_or_default(),
             options.fastshell_enabled,
@@ -658,6 +670,11 @@ pub fn plan_guidance_apply(paths: &ControlPaths) -> Result<GuidancePlan, String>
     let mut current_settings = settings::load(paths)?;
     let (fastshell_enabled, previous_guidance) = applied_guidance_state(paths, &current_settings)?;
     let agents_original = transaction::read_snapshot(&paths.codex_agents)?;
+    validate_v4_guidance_receipt(
+        paths,
+        current_settings.applied.as_ref(),
+        agents_original.as_deref().unwrap_or_default(),
+    )?;
     let state = agents_original
         .as_deref()
         .map_or(agents::ManagedSectionState::Missing, |bytes| {
@@ -862,19 +879,26 @@ pub fn plan_unapply(paths: &ControlPaths, options: UnapplyOptions) -> Result<Una
 
     let codex_original = transaction::read_snapshot(&paths.codex_config)?;
     let codex_source = codex_original.as_deref().unwrap_or_default();
+    let installed_original = transaction::read_snapshot(&paths.installed_binary)?;
+    let codex_source = without_receipted_direct_only_namespace(
+        paths,
+        codex_source,
+        applied.as_ref(),
+        installed_original.as_deref(),
+    )?;
     // token_limit is a shared global key: restore it only while it still equals the value written by Apply.
     // Otherwise leave it untouched under the same "undo only what we wrote and the user did not change" rule.
     let restore_token_limit = applied.as_ref().is_some_and(|record| {
-        codex_config::current_token_limit(codex_source) == Some(record.tool_output_token_limit)
+        codex_config::current_token_limit(&codex_source) == Some(record.tool_output_token_limit)
     });
     let codex_bytes = match applied.as_ref() {
         Some(record) => codex_config::unapply(
-            codex_source,
+            &codex_source,
             restore_token_limit,
             record.previous_token_limit_present,
             record.previous_token_limit,
         )?,
-        None => codex_config::unapply(codex_source, false, false, None)?,
+        None => codex_config::unapply(&codex_source, false, false, None)?,
     };
     let codex_original_existed = applied
         .as_ref()
@@ -935,7 +959,6 @@ pub fn plan_unapply(paths: &ControlPaths, options: UnapplyOptions) -> Result<Una
         None
     };
 
-    let installed_original = transaction::read_snapshot(&paths.installed_binary)?;
     let running_installed =
         cfg!(windows) && same_path(&options.current_executable, &paths.installed_binary);
     let manual_binary_cleanup = (cfg!(windows)
@@ -1257,6 +1280,95 @@ struct RecordMatchContext<'a> {
     codex_dir_created: bool,
 }
 
+fn validate_v4_guidance_receipt(
+    paths: &ControlPaths,
+    record: Option<&AppliedRecord>,
+    bytes: &[u8],
+) -> Result<(), String> {
+    let is_v4 = [false, true]
+        .iter()
+        .any(|shell| agents::has_exact_v4_section(bytes, *shell));
+    if is_v4
+        && !record.is_some_and(|record| {
+            record.agents_contract_id.as_deref() == Some("guidance-v4")
+                && agents::has_exact_v4_section(bytes, record.fastshell_enabled)
+                && record.codex_agents.as_ref().is_some_and(|managed| {
+                    managed.path == crate::paths::display_path(&paths.codex_agents)
+                        && managed.applied_sha256 == sha256(bytes)
+                })
+        })
+    {
+        return Err("Cannot prove ownership of the exact guidance-v4 block from its receipt and selected profile; no files were changed.".into());
+    }
+    if is_v4 {
+        validate_legacy_receipt_path(paths)?;
+    }
+    Ok(())
+}
+
+fn validate_legacy_receipt_path(paths: &ControlPaths) -> Result<(), String> {
+    for path in [&paths.fastctx_dir, &paths.fastctx_config] {
+        let metadata = fs::symlink_metadata(path).map_err(|error| {
+            format!(
+                "Cannot inspect legacy ownership receipt {}: {error}",
+                crate::paths::display_path(path)
+            )
+        })?;
+        if metadata.file_type().is_symlink() {
+            return Err("Unsafe legacy ownership receipt path: symbolic link.".into());
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            if metadata.uid() != unsafe { libc::geteuid() } || metadata.mode() & 0o022 != 0 {
+                return Err("Unsafe legacy ownership receipt: must be owned by the current user and not writable by other users.".into());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn without_receipted_direct_only_namespace(
+    paths: &ControlPaths,
+    source: &[u8],
+    record: Option<&AppliedRecord>,
+    installed_binary: Option<&[u8]>,
+) -> Result<Vec<u8>, String> {
+    let Some(record) = record.filter(|record| record.version == "0.2.23") else {
+        return Ok(source.to_vec());
+    };
+    let count = codex_config::namespace_count(source, "mcp__fastctx");
+    if count == 0 {
+        return Ok(source.to_vec());
+    }
+    validate_legacy_receipt_path(paths)?;
+    let expected = ExpectedConfig {
+        command: record.command.clone(),
+        tier: record.tier,
+        host_limit: record.tool_output_token_limit,
+        fastctx_budget: record.fastctx_token_budget,
+        tool_budgets: record.tool_budgets,
+        fastshell_enabled: record.fastshell_enabled,
+    };
+    if count != 1
+        || !record.targets_codex_profile(paths)
+        || record.command != crate::paths::display_path(&paths.installed_binary)
+        || record.tool_timeout_sec != Some(codex_config::TOOL_TIMEOUT_SECONDS)
+        || installed_binary.is_none_or(|bytes| sha256(bytes) != record.binary_sha256)
+        || !codex_config::drift_applied(
+            source,
+            &expected,
+            expected.host_limit,
+            expected.fastctx_budget,
+            record.tool_timeout_sec,
+        )?
+        .is_empty()
+    {
+        return Err("Cannot prove the 0.2.23 namespace ownership from the selected profile, installed binary, and managed fields. Review the receipt and mcp__fastctx policy before retrying; no files were changed.".into());
+    }
+    codex_config::remove_owned_direct_only_namespace(source)
+}
+
 fn record_matches(record: &AppliedRecord, context: &RecordMatchContext<'_>) -> bool {
     let RecordMatchContext {
         expected,
@@ -1438,7 +1550,7 @@ fn preview_apply(
                         )));
                     }
                 }
-                for legacy in ["mcp__fastread", "mcp__fastshell", "mcp__fastedit"] {
+                for legacy in ["mcp__fastread", "mcp__fastshell", "mcp__fastedit", "mcp__fastctx"] {
                     if codex_config::has_namespace(original, legacy)
                         && !codex_config::has_namespace(updated, legacy)
                     {
@@ -1458,7 +1570,6 @@ fn preview_apply(
                     )),
                     PreviewDetail::kept("[mcp_servers.fastctx] startup_timeout_sec = 120"),
                     PreviewDetail::kept("[mcp_servers.fastctx] tool_timeout_sec = 300"),
-                    PreviewDetail::kept("direct_only_tool_namespaces += \"mcp__fastctx\""),
                 ]);
                 match previous_token_limit {
                     Some(current) if current == new_limit => {}
@@ -1611,7 +1722,13 @@ fn preview_unapply(
                 if codex_config::has_server(original, "fastctx") {
                     details.push(PreviewDetail::removed("[mcp_servers.fastctx]"));
                 }
-                if codex_config::has_namespace(original, "mcp__fastctx") {
+                let updated = match &change.action {
+                    FileAction::Write(bytes) => bytes.as_slice(),
+                    FileAction::Delete => &[],
+                };
+                if codex_config::has_namespace(original, "mcp__fastctx")
+                    && !codex_config::has_namespace(updated, "mcp__fastctx")
+                {
                     details.push(PreviewDetail::removed(
                         "direct_only_tool_namespaces -= \"mcp__fastctx\"",
                     ));

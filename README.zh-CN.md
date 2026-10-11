@@ -12,7 +12,7 @@ FastCtx 是一个纯本地的 Rust 工具运行时，通过 MCP 提供文件读�
 
 MCP 会话只由宿主结束，不会因为共享运行时出问题而中断。控制中心不可达时，代理会把无法完成的调用逐条显式报错，再连上一个替代引擎（新拉起一个，或直接在代理自己进程内运行），并在同一条 stdio 通道上继续工作；有副作用的调用绝不重放。控制中心自身则在用过它的宿主进程还活着时一直驻留，等最后一个宿主退出、且没有连接、没有在执行的请求、没有运行中的后台任务之后，再过十分钟退出。
 
-本 fork 通过 [`PennixRv/fastctx`](https://github.com/PennixRv/fastctx) 的 scoped npm 包和对应 GitHub Release 资产分发。`pennix-workflow-lifecycle` Skill 按组件目录批准的版本安装 npm 包，预览 Codex 变更并显式应用。正常 Apply 和 TUI 路径不修改 `AGENTS.md`；用户规则模板由 [`PennixRv/pennix-skills`](https://github.com/PennixRv/pennix-skills) 仓库的 `skills/pennix-workflow-lifecycle/templates/AGENTS.md.install` 维护。
+本 fork 通过 [`PennixRv/fastctx`](https://github.com/PennixRv/fastctx) 的 scoped npm 包和对应 GitHub Release 资产分发。`pennix-component-lifecycle` Skill 按组件目录批准的版本安装 npm 包，预览 Codex 变更并显式应用。正常 Apply 和 TUI 路径不修改 `AGENTS.md`；用户规则模板由 [`PennixRv/pennix-skills`](https://github.com/PennixRv/pennix-skills) 仓库的 `skills/pennix-component-lifecycle/templates/AGENTS.md.install` 维护。
 
 当前优先支持 ChatGPT App 与 Codex CLI。任何 MCP client 也可以直接注册 `fastctx serve`。
 
@@ -36,9 +36,9 @@ FastCtx 将常见仓库操作整理成结构化输入输出。模型提供路径
 
 ## 安装
 
-### 使用 pennix-workflow-lifecycle 安装
+### 使用 pennix-component-lifecycle 安装
 
-部署入口是 `PennixRv/pennix-skills` 中的 `pennix-workflow-lifecycle` Skill：按组件目录批准的版本安装 scoped `@pennixrv/fastctx`，预览变更并取得明确确认后执行 `fastctx apply --guidance none`。本 fork 不发布、安装或更新上游 `fastctx` npm 包。
+部署入口是 `PennixRv/pennix-skills` 中的 `pennix-component-lifecycle` Skill：按组件目录批准的版本安装 scoped `@pennixrv/fastctx`，预览变更并取得明确确认后执行 `fastctx apply --guidance none`。本 fork 不发布、安装或更新上游 `fastctx` npm 包。
 
 首次启动会进入全屏控制终端。界面支持 17 种语言，主要操作包括：
 
@@ -374,11 +374,14 @@ FastCtx 使用或管理以下内容：
 - `~/.fastctx/config.toml`：控制终端配置与接入回执；
 - `~/.fastctx/jobs/`：由 `run_background` 按需创建的持久后台任务记录与当前格式完整输出日志；
 - `~/.codex/config.toml` 中的 `[mcp_servers.fastctx]`，其中包括 `tool_timeout_sec = 300`；
-- `direct_only_tool_namespaces` 中的 `mcp__fastctx` 元素；
 - 仅在显式管理 guidance 时，才写入 `~/.codex/AGENTS.md` 中带边界标记的 FastCtx 段；
 - 用户确认后的 `tool_output_token_limit` 档位值。
 
 FastCtx 使用 `toml_edit` 修改已有 TOML，保留注释、格式和其他配置。移除按写入所有权逐项撤销，用户后续改动会保留；删除 `~/.fastctx/` 前会先终止所有运行中的后台任务。
+
+宿主实际暴露工具时，FastCtx 支持直接调用和宿主原生工具编排。Apply 不创建、也不要求 `direct_only_tool_namespaces` 元素。从核验通过的 0.2.23 接入升级时，只移除 receipt 所属的 `mcp__fastctx` 元素，保留其他 namespace 和注释。没有所有权证据的同名元素保留，包括用户在 0.2.24 接入后新增的元素。工具可见性需要在新的真实会话中核验；聚合必须保留逐工具结果及续读参数，结果截断时先通过有界直接调用补回，再沿 `Partial` 指定的 offset 继续。
+
+可选受管指导段现使用 `guidance-v5`。具备有效 receipt 的完整 `guidance-v4` 段需要显式执行 `fastctx guidance apply` 或 `fastctx apply --guidance managed`；默认 `--guidance none` 保留旧段，并报告待执行动作。
 
 ## License
 

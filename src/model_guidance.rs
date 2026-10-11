@@ -2,8 +2,9 @@
 
 /// Positive routing shared by the host guidance file and every fresh MCP connection.
 pub(crate) const LOCAL_FILE_ROUTE_GUIDANCE: &str = concat!(
-    "Use FastCtx file tools directly for local-file operations, including when a\n",
-    "local reference is URI-shaped; pass the equivalent plain absolute filesystem path."
+    "Route local files to FastCtx (URI refs as absolute paths), directly or via\n",
+    "host-native orchestration. Preserve results and Complete/Partial details;\n",
+    "recover truncation with bounded direct calls."
 );
 
 /// Shared path-shape contract used by every file tool's path field.
@@ -54,9 +55,9 @@ pub(crate) fn inspect_tool_description() -> String {
 
 pub(crate) fn server_instructions(enable_shell: bool) -> String {
     let tools = if enable_shell {
-        "Local-file tools: inspect_local_file, grep, glob, replace, plus POSIX-bash shell tools."
+        "Local-file and shell tools: FastCtx."
     } else {
-        "Local-file tools: inspect_local_file, grep, glob, and replace."
+        "Local-file tools: FastCtx."
     };
     format!("{tools} {}", LOCAL_FILE_ROUTE_GUIDANCE.replace('\n', " "))
 }

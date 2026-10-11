@@ -88,32 +88,17 @@ pub fn apply(original: &[u8], expected: &ExpectedConfig) -> Result<ApplyEdit, St
     }
     mcp_servers.insert("fastctx", Item::Table(fastctx_table));
 
-    let features = ensure_table(&mut document, "features")?;
-    let code_mode = ensure_child_table(features, "code_mode", "features.code_mode")?;
-    match code_mode.get_mut("direct_only_tool_namespaces") {
-        Some(item) => {
-            let array = item.as_array_mut().ok_or_else(|| {
-                "Codex config key features.code_mode.direct_only_tool_namespaces is not an array. Repair it manually and retry."
-                    .to_string()
-            })?;
-            if legacy.fastread {
-                reconcile_namespace(array, LEGACY_FASTREAD_NAMESPACE, false);
-            }
-            if legacy.fastshell {
-                reconcile_namespace(array, LEGACY_FASTSHELL_NAMESPACE, false);
-            }
-            if legacy.fastedit {
-                reconcile_namespace(array, LEGACY_FASTEDIT_NAMESPACE, false);
-            }
-            reconcile_namespace(array, FASTCTX_NAMESPACE, true);
+    if (legacy.fastread || legacy.fastshell || legacy.fastedit)
+        && let Some(array) = namespace_array_mut(&mut document)?
+    {
+        if legacy.fastread {
+            remove_namespace(array, LEGACY_FASTREAD_NAMESPACE);
         }
-        None => {
-            let mut array = Array::new();
-            array.push(FASTCTX_NAMESPACE);
-            code_mode.insert(
-                "direct_only_tool_namespaces",
-                Item::Value(Value::Array(array)),
-            );
+        if legacy.fastshell {
+            remove_namespace(array, LEGACY_FASTSHELL_NAMESPACE);
+        }
+        if legacy.fastedit {
+            remove_namespace(array, LEGACY_FASTEDIT_NAMESPACE);
         }
     }
     set_integer(&mut document, "tool_output_token_limit", requested_limit)?;
@@ -150,54 +135,6 @@ pub fn unapply(
         // this also keeps drift-free reverse removal byte-exact with Apply (2026-07-12).
         if emptied {
             document.remove("mcp_servers");
-        }
-    }
-
-    if document.get("features").is_some() {
-        let emptied = {
-            let features = document
-                .get_mut("features")
-                .and_then(Item::as_table_mut)
-                .ok_or_else(|| {
-                    "Codex config key features is not a table. Repair it manually and retry."
-                        .to_string()
-                })?;
-            let mut remove_code_mode = false;
-            if features.get("code_mode").is_some() {
-                let code_mode = features
-                    .get_mut("code_mode")
-                    .and_then(Item::as_table_mut)
-                    .ok_or_else(|| {
-                        "Codex config key features.code_mode is not a table. Repair it manually and retry."
-                            .to_string()
-                    })?;
-                if code_mode.get("direct_only_tool_namespaces").is_some() {
-                    let array = code_mode
-                        .get_mut("direct_only_tool_namespaces")
-                        .and_then(Item::as_array_mut)
-                        .ok_or_else(|| {
-                            "Codex config key features.code_mode.direct_only_tool_namespaces is not an array. Repair it manually and retry."
-                                .to_string()
-                        })?;
-                    for index in (0..array.len()).rev() {
-                        if array.get(index).and_then(Value::as_str) == Some(FASTCTX_NAMESPACE) {
-                            remove_array_index_preserving_trailing(array, index);
-                        }
-                    }
-                    if array.is_empty() {
-                        code_mode.remove("direct_only_tool_namespaces");
-                    }
-                }
-                remove_code_mode = code_mode.is_empty();
-            }
-            if remove_code_mode {
-                features.remove("code_mode");
-            }
-            features.is_empty()
-        };
-        // Likewise remove a features table created solely by Apply after code_mode is removed.
-        if emptied {
-            document.remove("features");
         }
     }
 
@@ -240,6 +177,10 @@ pub fn has_server(original: &[u8], name: &str) -> bool {
 
 /// Returns whether the direct-only namespace array contains an entry.
 pub fn has_namespace(original: &[u8], namespace: &str) -> bool {
+    namespace_count(original, namespace) > 0
+}
+
+pub(crate) fn namespace_count(original: &[u8], namespace: &str) -> usize {
     parse(original)
         .ok()
         .and_then(|document| {
@@ -250,9 +191,23 @@ pub fn has_namespace(original: &[u8], namespace: &str) -> bool {
                 .and_then(Item::as_table_like)
                 .and_then(|table| table.get("direct_only_tool_namespaces"))
                 .and_then(Item::as_array)
-                .map(|array| array.iter().any(|entry| entry.as_str() == Some(namespace)))
+                .map(|array| {
+                    array
+                        .iter()
+                        .filter(|entry| entry.as_str() == Some(namespace))
+                        .count()
+                })
         })
-        .unwrap_or(false)
+        .unwrap_or(0)
+}
+
+/// Called only after the control layer proves ownership from the 0.2.23 receipt.
+pub(crate) fn remove_owned_direct_only_namespace(original: &[u8]) -> Result<Vec<u8>, String> {
+    let mut document = parse(original)?;
+    if let Some(array) = namespace_array_mut(&mut document)? {
+        remove_namespace(array, FASTCTX_NAMESPACE);
+    }
+    Ok(document.to_string().into_bytes())
 }
 
 /// Checks each Codex configuration item against the Apply receipt.
@@ -344,26 +299,6 @@ fn drift_with_limits(
         }
         None => drift.push("mcp_servers.fastctx".to_string()),
     }
-    let namespaces = document
-        .get("features")
-        .and_then(Item::as_table_like)
-        .and_then(|table| table.get("code_mode"))
-        .and_then(Item::as_table_like)
-        .and_then(|table| table.get("direct_only_tool_namespaces"))
-        .and_then(Item::as_array);
-    let count = namespaces
-        .map(|array| {
-            array
-                .iter()
-                .filter(|entry| entry.as_str() == Some(FASTCTX_NAMESPACE))
-                .count()
-        })
-        .unwrap_or(0);
-    if count != 1 {
-        drift.push(format!(
-            "features.code_mode.direct_only_tool_namespaces[{FASTCTX_NAMESPACE}]"
-        ));
-    }
     if document
         .get("tool_output_token_limit")
         .and_then(Item::as_integer)
@@ -404,60 +339,36 @@ fn set_integer(document: &mut DocumentMut, key: &str, integer: i64) -> Result<()
     Ok(())
 }
 
-fn push_preserving_array_trailing(array: &mut Array, entry: &str) {
-    let trailing = array
-        .len()
-        .checked_sub(1)
-        .and_then(|index| array.get_mut(index))
-        .and_then(|value| value.decor().suffix().cloned());
-    if let Some(last) = array
-        .len()
-        .checked_sub(1)
-        .and_then(|index| array.get_mut(index))
-    {
-        last.decor_mut().set_suffix("");
-    }
-    let mut value = Value::from(entry);
-    value
-        .decor_mut()
-        .set_prefix(if array.is_empty() { "" } else { " " });
-    if let Some(trailing) = trailing {
-        value.decor_mut().set_suffix(trailing);
-    }
-    array.push_formatted(value);
-}
-
-fn reconcile_namespace(array: &mut Array, namespace: &str, enabled: bool) {
+fn remove_namespace(array: &mut Array, namespace: &str) {
     let matching = array
         .iter()
         .enumerate()
         .filter_map(|(index, value)| (value.as_str() == Some(namespace)).then_some(index))
         .collect::<Vec<_>>();
-    let keep = enabled.then(|| matching.first().copied()).flatten();
     for index in matching.into_iter().rev() {
-        if Some(index) != keep {
-            remove_array_index_preserving_trailing(array, index);
-        }
-    }
-    if enabled && keep.is_none() {
-        push_preserving_array_trailing(array, namespace);
+        remove_array_index_preserving_trailing(array, index);
     }
 }
 
 fn remove_array_index_preserving_trailing(array: &mut Array, index: usize) {
-    let suffix = (index + 1 == array.len())
-        .then(|| {
-            array
-                .get(index)
-                .and_then(|value| value.decor().suffix().cloned())
-        })
-        .flatten();
-    array.remove(index);
-    if let (Some(previous), Some(suffix)) = (
-        index.checked_sub(1).and_then(|index| array.get_mut(index)),
-        suffix,
-    ) {
-        previous.decor_mut().set_suffix(suffix);
+    let removed = array.remove(index);
+    let decor = removed.decor();
+    let comments = format!(
+        "{}{}",
+        decor.prefix().and_then(|s| s.as_str()).unwrap_or_default(),
+        decor.suffix().and_then(|s| s.as_str()).unwrap_or_default()
+    );
+    if let Some(next) = array.get_mut(index) {
+        let prefix = next
+            .decor()
+            .prefix()
+            .and_then(|s| s.as_str())
+            .unwrap_or_default();
+        let prefix = format!("{comments}{prefix}");
+        next.decor_mut().set_prefix(prefix);
+    } else {
+        let trailing = array.trailing().as_str().unwrap_or_default();
+        array.set_trailing(format!("{comments}{trailing}"));
     }
 }
 
@@ -473,20 +384,14 @@ fn ensure_table<'a>(document: &'a mut DocumentMut, key: &str) -> Result<&'a mut 
         })
 }
 
-fn ensure_child_table<'a>(
-    parent: &'a mut Table,
-    key: &str,
-    display: &str,
-) -> Result<&'a mut Table, String> {
-    if parent.get(key).is_none() {
-        parent.insert(key, Item::Table(Table::new()));
-    }
-    parent
-        .get_mut(key)
-        .and_then(Item::as_table_mut)
-        .ok_or_else(|| {
-            format!("Codex config key {display} is not a table. Repair it manually and retry.")
-        })
+fn namespace_array_mut(document: &mut DocumentMut) -> Result<Option<&mut Array>, String> {
+    let item = document
+        .get_mut("features")
+        .and_then(Item::as_table_like_mut)
+        .and_then(|table| table.get_mut("code_mode"))
+        .and_then(Item::as_table_like_mut)
+        .and_then(|table| table.get_mut("direct_only_tool_namespaces"));
+    item.map(|item| item.as_array_mut().ok_or_else(|| "Codex config key features.code_mode.direct_only_tool_namespaces is not an array. Repair it manually and retry.".to_string())).transpose()
 }
 
 fn build_fastctx_table(expected: &ExpectedConfig) -> Table {
@@ -773,5 +678,47 @@ fn check_env_value(
     let expected_string = expected.map(|value| value.to_string());
     if actual != expected_string.as_deref() {
         drift.push(format!("mcp_servers.fastctx.env.{key}"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn removing_the_owned_element_retains_comments_at_every_array_position() {
+        for entries in [
+            "\n # 注释\n 'mcp__fastctx' # suffix\n",
+            " 'alpha',\n # 注释\n 'mcp__fastctx' # suffix\n",
+            "\n # 注释\n 'mcp__fastctx', # suffix\n 'omega'",
+        ] {
+            let original = format!(
+                "# heading\n[features.code_mode]\ndirect_only_tool_namespaces = [{entries}] # tail\nother = 'retained'\n"
+            );
+            let edited = remove_owned_direct_only_namespace(original.as_bytes()).unwrap();
+            let edited = String::from_utf8(edited).unwrap();
+            for comment in [
+                "# heading",
+                "# 注释",
+                "# suffix",
+                "# tail",
+                "other = 'retained'",
+            ] {
+                assert!(edited.contains(comment), "{edited}");
+            }
+            assert!(!has_namespace(edited.as_bytes(), "mcp__fastctx"));
+            assert_eq!(
+                has_namespace(edited.as_bytes(), "alpha"),
+                original.contains("alpha")
+            );
+            assert_eq!(
+                has_namespace(edited.as_bytes(), "omega"),
+                original.contains("omega")
+            );
+            assert_eq!(
+                remove_owned_direct_only_namespace(edited.as_bytes()).unwrap(),
+                edited.as_bytes()
+            );
+        }
     }
 }

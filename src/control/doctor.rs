@@ -691,21 +691,6 @@ fn missing_receipt_keys(
             });
         }
     }
-    let has_namespace = document
-        .get("features")
-        .and_then(Item::as_table_like)
-        .and_then(|table| table.get("code_mode"))
-        .and_then(Item::as_table_like)
-        .and_then(|table| table.get("direct_only_tool_namespaces"))
-        .and_then(Item::as_array)
-        .is_some_and(|array| {
-            array
-                .iter()
-                .any(|item| item.as_str() == Some("mcp__fastctx"))
-        });
-    if !has_namespace {
-        missing.push("features.code_mode.direct_only_tool_namespaces[mcp__fastctx]");
-    }
     missing
 }
 
@@ -1140,6 +1125,23 @@ fn check_agents_state(
             "AGENTS guidance",
             "State: current without an Apply receipt. Automatic updates will not claim ownership; run fastctx apply to record the connection, then restart Codex.",
         ),
+        agents::ManagedSectionState::KnownLegacy
+            if applied.is_some_and(|record| {
+                record.agents_contract_id.as_deref() == Some("guidance-v4")
+                    && record.codex_agents.as_ref().is_some_and(|managed| {
+                        managed.path == crate::paths::display_path(&paths.codex_agents)
+                    })
+                    && std::fs::read(&paths.codex_agents).is_ok_and(|bytes| {
+                        agents::has_exact_v4_section(&bytes, record.fastshell_enabled)
+                    })
+            }) =>
+        {
+            DoctorCheck::fail(
+                "AGENTS guidance",
+                "State: superseded guidance-v4, Apply required. The exact receipted block remains unchanged until explicit guidance acceptance.",
+                "Run fastctx guidance apply or fastctx apply --guidance managed, then restart Codex.",
+            )
+        }
         agents::ManagedSectionState::KnownLegacy
             if applied.is_some_and(|record| record.agents_contract_id.is_some()) =>
         {

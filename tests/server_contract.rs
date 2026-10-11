@@ -595,6 +595,18 @@ fn stdio_mcp_is_tool_only_lists_tools_and_never_returns_structured_content() {
     );
     let instructions = initialized["result"]["instructions"].as_str().unwrap();
     assert!(instructions.contains("Local-file tools"), "{instructions}");
+    assert!(
+        instructions.contains("host-native orchestration"),
+        "{instructions}"
+    );
+    assert!(
+        instructions.contains("Complete/Partial details"),
+        "{instructions}"
+    );
+    assert!(
+        instructions.contains("bounded direct calls"),
+        "{instructions}"
+    );
     assert!(!instructions.contains("MCP resources"), "{instructions}");
     assert!(instructions.chars().count() <= 250, "{instructions}");
     send(

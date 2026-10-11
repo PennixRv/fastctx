@@ -12,7 +12,7 @@ Each `fastctx serve` process is a thin stdio proxy. Proxies for the same user an
 
 An MCP session ends when its host ends it, never because the shared runtime had a problem. If the control center becomes unreachable, the proxy answers the calls it can no longer complete with an explicit error, reconnects to a replacement — starting one, or running the engine inside the proxy itself — and carries on over the same stdio transport. Side-effecting calls are never replayed. The control center itself stays resident while any host process that used it is still running, and exits ten minutes after the last of them is gone, with no connection, no active request, and no running background job.
 
-This fork is distributed as scoped npm packages and matching GitHub Release assets from [`PennixRv/fastctx`](https://github.com/PennixRv/fastctx). The `pennix-workflow-lifecycle` Skill installs the exact catalog-approved npm version, previews the Codex changes, and applies them explicitly. The normal Apply and TUI paths leave `AGENTS.md` untouched; [`PennixRv/pennix-skills`](https://github.com/PennixRv/pennix-skills) maintains the user instruction template at `skills/pennix-workflow-lifecycle/templates/AGENTS.md.install`.
+This fork is distributed as scoped npm packages and matching GitHub Release assets from [`PennixRv/fastctx`](https://github.com/PennixRv/fastctx). The `pennix-component-lifecycle` Skill installs the exact catalog-approved npm version, previews the Codex changes, and applies them explicitly. The normal Apply and TUI paths leave `AGENTS.md` untouched; [`PennixRv/pennix-skills`](https://github.com/PennixRv/pennix-skills) maintains the user instruction template at `skills/pennix-component-lifecycle/templates/AGENTS.md.install`.
 
 FastCtx currently provides first-class setup for ChatGPT App and Codex CLI. Any MCP client can also register `fastctx serve` directly.
 
@@ -36,9 +36,9 @@ This greatly reduces the attention the model spends on tool mechanics, such as c
 
 ## Installation
 
-### Install with pennix-workflow-lifecycle
+### Install with pennix-component-lifecycle
 
-The supported deployment entry is the `pennix-workflow-lifecycle` Skill in `PennixRv/pennix-skills`. It installs the scoped `@pennixrv/fastctx` package at the catalog-approved version, then invokes `fastctx apply --guidance none` through a preview and explicit confirmation. This fork never publishes, installs, or updates the upstream `fastctx` npm package.
+The supported deployment entry is the `pennix-component-lifecycle` Skill in `PennixRv/pennix-skills`. It installs the scoped `@pennixrv/fastctx` package at the catalog-approved version, then invokes `fastctx apply --guidance none` through a preview and explicit confirmation. This fork never publishes, installs, or updates the upstream `fastctx` npm package.
 
 The first launch opens the full-screen control terminal. The interface supports 17 languages and provides these main actions:
 
@@ -380,11 +380,14 @@ FastCtx uses or manages these paths and settings:
 - `~/.fastctx/config.toml`: control terminal settings and the connection receipt;
 - `~/.fastctx/jobs/`: persistent background-job records and current-format full output logs, created on demand by `run_background`;
 - `[mcp_servers.fastctx]` in `~/.codex/config.toml`, including `tool_timeout_sec = 300`;
-- the `mcp__fastctx` entry in `direct_only_tool_namespaces`;
 - the marker-delimited FastCtx block in `~/.codex/AGENTS.md` only when guidance is explicitly managed;
 - the selected `tool_output_token_limit` value after user confirmation.
 
 FastCtx edits existing TOML with `toml_edit`, preserving comments, formatting, and unrelated configuration. Removal removes entries according to write ownership and preserves later user changes. It stops running background jobs before removing `~/.fastctx/`.
+
+FastCtx supports direct calls and the host's native tool orchestration when the host exposes them. Apply does not create or require a `direct_only_tool_namespaces` entry. Upgrading a verified 0.2.23 connection removes only its receipted `mcp__fastctx` element; other namespaces and comments remain. An unowned element stays in place, including one added after a 0.2.24 Apply. Host exposure must be verified in a fresh session. Aggregation must preserve each tool's result and continuation; recover truncated results with bounded direct calls before following a `Partial` offset.
+
+Optional managed guidance now uses `guidance-v5`. A receipted exact `guidance-v4` block requires explicit `fastctx guidance apply` or `fastctx apply --guidance managed`; the default `--guidance none` preserves it and reports the pending action.
 
 ## License
 

@@ -567,13 +567,17 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let first = temp.path().join("first.txt");
         let second = temp.path().join("second.txt");
-        std::fs::write(&first, b"one").unwrap();
+        let original = b"# host policy\n[features.code_mode]\ndirect_only_tool_namespaces = ['user', 'mcp__fastctx'] # keep\n";
+        std::fs::write(&first, original).unwrap();
         std::fs::write(&second, b"two").unwrap();
         let changes = vec![
             FileChange {
                 target: first.clone(),
                 original: read_snapshot(&first).unwrap(),
-                action: FileAction::Write(b"ONE".to_vec()),
+                action: FileAction::Write(
+                    crate::control::codex_config::remove_owned_direct_only_namespace(original)
+                        .unwrap(),
+                ),
                 unix_mode: None,
                 locked_binary_fallback: false,
             },
@@ -593,7 +597,7 @@ mod tests {
         })
         .unwrap_err();
         assert!(error.contains("changed while the transaction was in progress"));
-        assert_eq!(std::fs::read(&first).unwrap(), b"one");
+        assert_eq!(std::fs::read(&first).unwrap(), original);
         assert_eq!(std::fs::read(&second).unwrap(), b"user edit during commit");
     }
 

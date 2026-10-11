@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 const BEGIN_MARKER: &str = "<!-- fastctx:begin -->";
 const END_MARKER: &str = "<!-- fastctx:end -->";
-pub(crate) const MANAGED_SECTION_CONTRACT_ID: &str = "guidance-v4";
+pub(crate) const MANAGED_SECTION_CONTRACT_ID: &str = "guidance-v5";
 const LEGACY_BEGIN_MARKER: &str = "<!-- fastread:begin -->";
 const LEGACY_END_MARKER: &str = "<!-- fastread:end -->";
 const LEGACY_FASTREAD_SECTION: &str = concat!(
@@ -147,6 +147,8 @@ const V024_READ_TOOL_NAME_SHELL_GUIDANCE: &str = V022_RESOURCE_ROUTING_SHELL_GUI
 /// One byte-frozen managed block from a superseded release.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum KnownLegacyGuidance {
+    /// Byte-frozen guidance-v4, superseded when native host orchestration was allowed.
+    DirectCallRouting,
     /// 0.2.2/0.2.3, whose prohibition named the very resource tools it steered away from.
     ResourceRouting,
     /// 0.2.4, superseded when the file-inspection tool was renamed away from `read`.
@@ -155,10 +157,15 @@ pub(crate) enum KnownLegacyGuidance {
 
 impl KnownLegacyGuidance {
     /// Every superseded release this build still recognises, newest first.
-    pub(crate) const ALL: [Self; 2] = [Self::ReadToolName, Self::ResourceRouting];
+    pub(crate) const ALL: [Self; 3] = [
+        Self::DirectCallRouting,
+        Self::ReadToolName,
+        Self::ResourceRouting,
+    ];
 
     fn guidance(self) -> (&'static str, &'static str) {
         match self {
+            Self::DirectCallRouting => ("", SHELL_GUIDANCE),
             Self::ResourceRouting => (
                 V022_RESOURCE_ROUTING_FILE_GUIDANCE,
                 V022_RESOURCE_ROUTING_SHELL_GUIDANCE,
@@ -175,7 +182,13 @@ impl KnownLegacyGuidance {
         let (file_guidance, shell_guidance) = self.guidance();
         let mut output = String::from(BEGIN_MARKER);
         output.push('\n');
-        output.push_str(file_guidance);
+        if self == Self::DirectCallRouting {
+            output.push_str(FILE_GUIDANCE_PREFIX);
+            output.push_str("Use FastCtx file tools directly for local-file operations, including when a\nlocal reference is URI-shaped; pass the equivalent plain absolute filesystem path.\n");
+            output.push_str(FILE_GUIDANCE_SUFFIX);
+        } else {
+            output.push_str(file_guidance);
+        }
         if fastshell_enabled {
             output.push('\n');
             output.push_str(shell_guidance);
@@ -376,6 +389,18 @@ pub(crate) fn classify_managed_section(
     }
 }
 
+pub(crate) fn has_exact_v4_section(bytes: &[u8], fastshell_enabled: bool) -> bool {
+    let Ok(source) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    section_range(source)
+        .ok()
+        .flatten()
+        .is_some_and(|(start, end)| {
+            source[start..end] == KnownLegacyGuidance::DirectCallRouting.section(fastshell_enabled)
+        })
+}
+
 pub(crate) fn refresh_known_legacy_section(
     bytes: &[u8],
     fastshell_enabled: bool,
@@ -457,4 +482,38 @@ fn marker_range(
     }
     let end = end_start + end_marker.len();
     Ok(Some((start, end)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sha2::Digest;
+
+    #[test]
+    fn guidance_v4_bytes_are_frozen_for_both_shell_states() {
+        for (shell, digest) in [
+            (
+                false,
+                "1a3b5e295d0118800eb5812f7f3357f7bf298aa315a1bf3e4d13654666ab0c00",
+            ),
+            (
+                true,
+                "6a0bdd0cc6595060ca2e83302d0982236d16abe08c49921eb666f5924cbb1514",
+            ),
+        ] {
+            let old = KnownLegacyGuidance::DirectCallRouting.section(shell);
+            assert_eq!(hex::encode(sha2::Sha256::digest(old.as_bytes())), digest);
+            assert!(has_exact_v4_section(old.as_bytes(), shell));
+            assert_eq!(
+                classify_managed_section(old.as_bytes(), shell),
+                ManagedSectionState::KnownLegacy
+            );
+            assert!(!section(shell).contains("Use FastCtx file tools directly"));
+            assert!(section(shell).contains("host-native orchestration"));
+            assert!(!has_exact_v4_section(
+                old.replace("Read only", "Read all").as_bytes(),
+                shell
+            ));
+        }
+    }
 }

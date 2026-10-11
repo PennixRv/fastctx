@@ -302,6 +302,7 @@ impl<R> RequestSpecShared<R> {
         generation: u64,
         permit: BurstPermit,
     ) -> Option<RunningLease<R>> {
+        #[allow(deprecated)] // fetch_update remains available on the declared Rust 1.88 minimum.
         let runner_id = self
             .next_runner_id
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {

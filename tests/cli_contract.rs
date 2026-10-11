@@ -240,8 +240,8 @@ fn apply_status_and_unapply_cover_both_shell_states() {
             expected_args.push("--enable-shell");
         }
         assert_eq!(args, expected_args, "{config}");
-        assert!(config.contains("mcp__fastctx"));
-        assert_eq!(config.matches("mcp__fastctx").count(), 1);
+        assert!(!config.contains("mcp__fastctx"), "{config}");
+        assert!(!config.contains("[features"), "{config}");
         assert!(!config.contains("approval_mode"), "{config}");
 
         let agents = std::fs::read_to_string(codex.join("AGENTS.md")).unwrap();
@@ -578,6 +578,296 @@ fn a_non_tty_apply_without_yes_refuses_a_shared_limit_conflict_without_writes() 
     assert!(preview.contains("100000"), "{preview}");
     assert_eq!(std::fs::read(codex.join("config.toml")).unwrap(), config);
     assert!(!temp.path().join(".fastctx").exists());
+}
+
+#[test]
+fn trusted_0223_receipt_removes_only_its_namespace_and_new_receipt_never_owns_it() {
+    let temp = profile_test_home();
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["apply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    let config_path = temp.path().join(".codex/config.toml");
+    let receipt_path = temp.path().join(".fastctx/config.toml");
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    let host_policy = concat!(
+        "\n# user host policy\n[features.code_mode]\n",
+        "direct_only_tool_namespaces = [\n 'alpha',\n # retained comment\n 'mcp__fastctx',\n 'omega',\n] # retained tail\n",
+    );
+    std::fs::write(&config_path, format!("{config}{host_policy}")).unwrap();
+    let mut receipt: toml_edit::DocumentMut = std::fs::read_to_string(&receipt_path)
+        .unwrap()
+        .parse()
+        .unwrap();
+    receipt["applied"]["version"] = toml_edit::value("0.2.23");
+    std::fs::write(&receipt_path, receipt.to_string()).unwrap();
+    let upgraded = isolated_command(temp.path())
+        .args(["apply", "--yes"])
+        .output()
+        .unwrap();
+    assert_success(&upgraded);
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    assert!(!config.contains("mcp__fastctx"), "{config}");
+    for preserved in [
+        "'alpha'",
+        "'omega'",
+        "# retained comment",
+        "# retained tail",
+        "# user host policy",
+    ] {
+        assert!(config.contains(preserved), "{config}");
+    }
+    assert!(
+        String::from_utf8_lossy(&upgraded.stdout)
+            .contains("direct_only_tool_namespaces -= \"mcp__fastctx\"")
+    );
+    let user_policy = config.replace("'alpha'", "'mcp__fastctx'");
+    std::fs::write(&config_path, &user_policy).unwrap();
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["apply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(std::fs::read_to_string(&config_path).unwrap(), user_policy);
+    let removed = isolated_command(temp.path())
+        .args(["unapply", "--yes"])
+        .output()
+        .unwrap();
+    assert_success(&removed);
+    assert!(
+        std::fs::read_to_string(&config_path)
+            .unwrap()
+            .contains("'mcp__fastctx'")
+    );
+    assert!(!String::from_utf8_lossy(&removed.stdout).contains("direct_only_tool_namespaces -="));
+}
+
+#[test]
+fn conflicting_0223_receipt_blocks_namespace_migration_without_any_write() {
+    let temp = profile_test_home();
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["apply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    let config_path = temp.path().join(".codex/config.toml");
+    let receipt_path = temp.path().join(".fastctx/config.toml");
+    let config = std::fs::read_to_string(&config_path).unwrap();
+    let config = format!(
+        "{config}\n[features.code_mode]\ndirect_only_tool_namespaces = ['mcp__fastctx', 'mcp__fastctx']\n"
+    );
+    std::fs::write(&config_path, &config).unwrap();
+    let mut receipt: toml_edit::DocumentMut = std::fs::read_to_string(&receipt_path)
+        .unwrap()
+        .parse()
+        .unwrap();
+    receipt["applied"]["version"] = toml_edit::value("0.2.23");
+    std::fs::write(&receipt_path, receipt.to_string()).unwrap();
+    let receipt = std::fs::read(&receipt_path).unwrap();
+    for action in ["apply", "unapply"] {
+        let result = isolated_command(temp.path())
+            .args([action, "--yes"])
+            .output()
+            .unwrap();
+        assert!(!result.status.success());
+        assert!(
+            String::from_utf8_lossy(&result.stderr).contains("namespace ownership"),
+            "{result:?}"
+        );
+        assert_eq!(std::fs::read_to_string(&config_path).unwrap(), config);
+        assert_eq!(std::fs::read(&receipt_path).unwrap(), receipt);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn an_unsafe_legacy_receipt_cannot_authorize_namespace_removal() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = profile_test_home();
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["apply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    let config_path = temp.path().join(".codex/config.toml");
+    let receipt_path = temp.path().join(".fastctx/config.toml");
+    let config = format!(
+        "{}\n[features.code_mode]\ndirect_only_tool_namespaces = ['mcp__fastctx']\n",
+        std::fs::read_to_string(&config_path).unwrap()
+    );
+    std::fs::write(&config_path, &config).unwrap();
+    let mut receipt: toml_edit::DocumentMut = std::fs::read_to_string(&receipt_path)
+        .unwrap()
+        .parse()
+        .unwrap();
+    receipt["applied"]["version"] = toml_edit::value("0.2.23");
+    std::fs::write(&receipt_path, receipt.to_string()).unwrap();
+    std::fs::set_permissions(&receipt_path, std::fs::Permissions::from_mode(0o666)).unwrap();
+    let before = std::fs::read(&receipt_path).unwrap();
+    for action in ["apply", "unapply"] {
+        let result = isolated_command(temp.path())
+            .args([action, "--yes"])
+            .output()
+            .unwrap();
+        assert!(!result.status.success());
+        assert!(
+            String::from_utf8_lossy(&result.stderr).contains("Unsafe legacy ownership receipt")
+        );
+        assert_eq!(std::fs::read_to_string(&config_path).unwrap(), config);
+        assert_eq!(std::fs::read(&receipt_path).unwrap(), before);
+    }
+}
+
+#[test]
+fn an_unknown_receipt_does_not_claim_a_user_namespace() {
+    let temp = profile_test_home();
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["apply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    let config_path = temp.path().join(".codex/config.toml");
+    let receipt_path = temp.path().join(".fastctx/config.toml");
+    let config = format!(
+        "{}\n[features.code_mode]\ndirect_only_tool_namespaces = ['mcp__fastctx', 'user'] # retained\n",
+        std::fs::read_to_string(&config_path).unwrap()
+    );
+    std::fs::write(&config_path, &config).unwrap();
+    let mut receipt: toml_edit::DocumentMut = std::fs::read_to_string(&receipt_path)
+        .unwrap()
+        .parse()
+        .unwrap();
+    receipt["applied"]["version"] = toml_edit::value("0.2.22");
+    std::fs::write(&receipt_path, receipt.to_string()).unwrap();
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["apply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(std::fs::read_to_string(&config_path).unwrap(), config);
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["unapply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    let removed = std::fs::read_to_string(&config_path).unwrap();
+    assert!(removed.contains("['mcp__fastctx', 'user'] # retained"));
+}
+
+#[test]
+fn stamped_v4_guidance_requires_explicit_acceptance_and_preserves_user_content() {
+    use sha2::Digest;
+    let temp = profile_test_home();
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["apply", "--guidance", "managed", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    let agents_path = temp.path().join(".codex/AGENTS.md");
+    let config_path = temp.path().join(".codex/config.toml");
+    let receipt_path = temp.path().join(".fastctx/config.toml");
+    let v5 = concat!(
+        "Route local files to FastCtx (URI refs as absolute paths), directly or via\n",
+        "host-native orchestration. Preserve results and Complete/Partial details;\n",
+        "recover truncation with bounded direct calls."
+    );
+    let v4 = fastctx::control::agents::section(false).replace(v5,
+        "Use FastCtx file tools directly for local-file operations, including when a\nlocal reference is URI-shaped; pass the equivalent plain absolute filesystem path.");
+    assert!(!v4.contains("native tool orchestration"));
+    let old = format!("# user prefix\n\n{v4}\nuser suffix\n");
+    std::fs::write(&agents_path, &old).unwrap();
+    let mut receipt: toml_edit::DocumentMut = std::fs::read_to_string(&receipt_path)
+        .unwrap()
+        .parse()
+        .unwrap();
+    receipt["applied"]["agents_contract_id"] = toml_edit::value("guidance-v4");
+    receipt["applied"]["codex_agents"]["applied_sha256"] = toml_edit::value("00".repeat(32));
+    std::fs::write(&receipt_path, receipt.to_string()).unwrap();
+    let rejected = isolated_command(temp.path())
+        .args(["guidance", "apply", "--yes"])
+        .output()
+        .unwrap();
+    assert!(!rejected.status.success());
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("guidance-v4"));
+    assert_eq!(std::fs::read_to_string(&agents_path).unwrap(), old);
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["apply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(std::fs::read_to_string(&agents_path).unwrap(), old);
+    let status = isolated_command(temp.path())
+        .args(["guidance", "status"])
+        .output()
+        .unwrap();
+    assert!(
+        String::from_utf8_lossy(&status.stdout).contains("superseded guidance-v4"),
+        "{status:?}"
+    );
+
+    let mut receipt: toml_edit::DocumentMut = std::fs::read_to_string(&receipt_path)
+        .unwrap()
+        .parse()
+        .unwrap();
+    receipt["applied"]["codex_agents"]["applied_sha256"] =
+        toml_edit::value(hex::encode(sha2::Sha256::digest(old.as_bytes())));
+    std::fs::write(&receipt_path, receipt.to_string()).unwrap();
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["guidance", "apply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    let current = std::fs::read_to_string(&agents_path).unwrap();
+    assert!(current.starts_with("# user prefix\n\n"));
+    assert!(current.ends_with("user suffix\n"));
+    assert!(current.contains(v5));
+    let old_with_user = format!("{old}additional user rule\n");
+    let current = std::fs::read_to_string(&agents_path).unwrap();
+    std::fs::write(&agents_path, format!("{current}additional user rule\n")).unwrap();
+    let config = std::fs::read(&config_path).unwrap();
+    assert_success(
+        &isolated_command(temp.path())
+            .args(["guidance", "apply", "--yes"])
+            .output()
+            .unwrap(),
+    );
+    let current = std::fs::read_to_string(&agents_path).unwrap();
+    assert!(current.starts_with("# user prefix\n\n"));
+    assert!(current.ends_with("user suffix\nadditional user rule\n"));
+    assert!(current.contains(v5));
+    assert_eq!(std::fs::read(&config_path).unwrap(), config);
+    assert!(
+        std::fs::read_to_string(&receipt_path)
+            .unwrap()
+            .contains("guidance-v5")
+    );
+
+    std::fs::write(&agents_path, &old_with_user).unwrap();
+    let receipt = std::fs::read(&receipt_path).unwrap();
+    for args in [
+        vec!["guidance", "apply", "--yes"],
+        vec!["apply", "--guidance", "managed", "--yes"],
+    ] {
+        let rejected = isolated_command(temp.path()).args(args).output().unwrap();
+        assert!(!rejected.status.success());
+        assert!(String::from_utf8_lossy(&rejected.stderr).contains("guidance-v4"));
+        assert_eq!(
+            std::fs::read_to_string(&agents_path).unwrap(),
+            old_with_user
+        );
+        assert_eq!(std::fs::read(&receipt_path).unwrap(), receipt);
+    }
 }
 
 fn command() -> Command {

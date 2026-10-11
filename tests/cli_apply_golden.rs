@@ -37,7 +37,7 @@ fn micro_edit_golden_preserves_every_unowned_byte_and_writes_the_exact_private_s
         "FASTCTX_GLOB_TOKEN_BUDGET = \"13500\"\n",
         "\n",
         "[features.code_mode]\n",
-        "direct_only_tool_namespaces = [ 'alpha', 'omega', \"mcp__fastctx\" ]\n",
+        "direct_only_tool_namespaces = [ 'alpha', 'omega' ]\n",
     );
     let edit = codex_config::apply(
         original.as_bytes(),
@@ -68,6 +68,36 @@ fn agents_golden_appends_the_exact_contract_after_one_blank_line() {
     assert_eq!(
         agents::apply_section(original.as_bytes()).unwrap(),
         expected.as_bytes()
+    );
+}
+
+#[test]
+fn fresh_apply_does_not_create_host_policy_and_unapply_preserves_a_user_namespace() {
+    let expected = ExpectedConfig {
+        command: "/home/test/.fastctx/bin/fastctx".into(),
+        tier: Tier::Standard,
+        host_limit: Tier::Standard.host_limit(),
+        fastctx_budget: Tier::Standard.fastctx_budget(),
+        tool_budgets: ToolBudgets::default(),
+        fastshell_enabled: false,
+    };
+    let fresh = codex_config::apply(b"", &expected).unwrap();
+    assert!(!String::from_utf8_lossy(&fresh.bytes).contains("[features"));
+    assert!(
+        codex_config::drift(&fresh.bytes, &expected)
+            .unwrap()
+            .is_empty()
+    );
+    let user_policy = b"# host policy\n[features.code_mode]\ndirect_only_tool_namespaces = ['alpha', 'mcp__fastctx', 'omega'] # keep\n";
+    let edit = codex_config::apply(user_policy, &expected).unwrap();
+    assert!(
+        codex_config::drift(&edit.bytes, &expected)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        codex_config::unapply(&edit.bytes, true, false, None).unwrap(),
+        user_policy
     );
 }
 
