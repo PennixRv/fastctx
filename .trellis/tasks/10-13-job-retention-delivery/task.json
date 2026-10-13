@@ -1,0 +1,49 @@
+{
+  "id": "job-retention-delivery",
+  "name": "job-retention-delivery",
+  "title": "记录运行作业资源预算交付",
+  "description": "承接根任务 revision 2 的 FastCtx R4；记录已发布实现与本地测试，刷新原生生成许可清单并收敛 CI",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-13",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "direct",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 1,
+      "seal": {
+        "revision": 1,
+        "task_id": "job-retention-delivery",
+        "task_name": "10-13-job-retention-delivery",
+        "documents": [
+          "prd.md"
+        ],
+        "document_digests": {
+          "prd.md": "c8231cdf6b6c1d0d2689efc5fdc086aac075dec5f9bc5b7747d599c1060cdb75"
+        },
+        "execution_class": "direct",
+        "delivery_mode": "change_bearing",
+        "sealed_at": "2026-10-13T12:54:21.511488+00:00"
+      },
+      "approved_revision": 1,
+      "approval_basis": "继承根任务 revision 2 已明确批准的相同修订包",
+      "approved_at": "2026-10-13T12:54:21.613014+00:00"
+    }
+  }
+}
