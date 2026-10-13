@@ -9,7 +9,9 @@ use super::model::{
 };
 use super::output_log::{BoundedLines, OutputLogReader};
 use crate::control::paths::ControlPaths;
-use crate::control::settings::{DEFAULT_JOB_STORAGE_LIMIT_MIB, DEFAULT_MAX_RUNNING_JOBS};
+use crate::control::settings::{
+    DEFAULT_JOB_STORAGE_LIMIT_MIB, DEFAULT_MAX_RUNNING_JOBS, DEFAULT_RUNNING_JOB_RESERVATION_MIB,
+};
 use crate::edit::private_storage::ensure_private_directory;
 use crate::paths::display_path;
 use serde::Serialize;
@@ -32,6 +34,7 @@ static JOB_ID_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 pub(crate) struct JobLimits {
     pub(crate) storage_limit_mib: u64,
     pub(crate) max_running_jobs: u64,
+    pub(crate) running_job_reservation_mib: u64,
 }
 
 impl Default for JobLimits {
@@ -39,7 +42,21 @@ impl Default for JobLimits {
         Self {
             storage_limit_mib: DEFAULT_JOB_STORAGE_LIMIT_MIB,
             max_running_jobs: DEFAULT_MAX_RUNNING_JOBS,
+            running_job_reservation_mib: DEFAULT_RUNNING_JOB_RESERVATION_MIB,
         }
+    }
+}
+
+impl JobLimits {
+    pub(crate) fn max_reserved_jobs(self) -> u64 {
+        self.storage_limit_mib
+            .checked_div(self.running_job_reservation_mib)
+            .unwrap_or(0)
+            .min(self.max_running_jobs)
+    }
+
+    fn reservation_bytes(self) -> u64 {
+        self.running_job_reservation_mib.saturating_mul(1024 * 1024)
     }
 }
 
@@ -201,6 +218,10 @@ pub(crate) fn effective_limits(paths: &ControlPaths) -> Result<JobLimits, String
         max_running_jobs: positive_or_default(
             settings.fastshell.max_running_jobs,
             DEFAULT_MAX_RUNNING_JOBS,
+        ),
+        running_job_reservation_mib: positive_or_default(
+            settings.fastshell.running_job_reservation_mib,
+            DEFAULT_RUNNING_JOB_RESERVATION_MIB,
         ),
     })
 }
@@ -1022,7 +1043,7 @@ pub(crate) fn clear_kill_request(directory: &Path) {
     }
 }
 
-pub(crate) fn reap(paths: &ControlPaths, limit_mib: u64) -> Result<u64, String> {
+pub(crate) fn reap(paths: &ControlPaths, limits: JobLimits) -> Result<u64, String> {
     let root = &paths.jobs_dir;
     let entries = match fs::read_dir(root) {
         Ok(entries) => entries,
@@ -1041,30 +1062,55 @@ pub(crate) fn reap(paths: &ControlPaths, limit_mib: u64) -> Result<u64, String> 
         })?;
         total = total.saturating_add(path_size(&entry.path())?);
     }
-    let limit = limit_mib.saturating_mul(1024 * 1024);
-    if total <= limit {
+    let limit = limits.storage_limit_mib.saturating_mul(1024 * 1024);
+    let registry = scan_registry(root)?;
+    let active = registry
+        .records
+        .iter()
+        .filter(|record| record.status.is_running())
+        .count() as u64
+        + registry.pending_reservations;
+    let active_actual = registry
+        .records
+        .iter()
+        .filter(|record| record.status.is_running())
+        .map(|record| path_size(&record.directory).unwrap_or(0))
+        .sum::<u64>();
+    let pending_actual = fs::read_dir(root)
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .filter(|entry| valid_job_id(&entry.file_name().to_string_lossy()))
+        .filter(|entry| !entry.path().join(META_FILE).exists())
+        .map(|entry| path_size(&entry.path()).unwrap_or(0))
+        .sum::<u64>();
+    let terminal_total = total.saturating_sub(active_actual.saturating_add(pending_actual));
+    let reserved = active.saturating_mul(limits.reservation_bytes());
+    if terminal_total.saturating_add(reserved) <= limit {
         return Ok(0);
     }
     let target = limit.saturating_mul(9) / 10;
-    let mut terminal = scan_registry(root)?
+    let terminal_target = target.saturating_sub(reserved);
+    let mut terminal = registry
         .records
         .into_iter()
         .filter(|record| !record.status.is_running())
         .collect::<Vec<_>>();
     terminal.sort_by_key(|record| record.ended_sort_key);
     let mut removed = 0_u64;
+    let mut terminal_total = terminal_total;
     for record in terminal {
-        if total <= target {
+        if terminal_total <= terminal_target {
             break;
         }
         let bytes = path_size(&record.directory).unwrap_or(0);
         match fs::remove_dir_all(&record.directory) {
             Ok(()) => {
-                total = total.saturating_sub(bytes);
+                terminal_total = terminal_total.saturating_sub(bytes);
                 removed = removed.saturating_add(1);
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                total = total.saturating_sub(bytes);
+                terminal_total = terminal_total.saturating_sub(bytes);
             }
             Err(error) => {
                 return Err(format!(
@@ -1139,7 +1185,9 @@ fn base36(mut value: u64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{open_log, read_log_delta, reap, scan_registry, valid_job_id, write_atomic_json};
+    use super::{
+        JobLimits, open_log, read_log_delta, reap, scan_registry, valid_job_id, write_atomic_json,
+    };
     use crate::control::paths::ControlPaths;
     use crate::control::settings::{FastCtxSettings, save};
     use crate::shell::jobs::TailCursor;
@@ -1257,6 +1305,24 @@ mod tests {
     }
 
     #[test]
+    fn running_reservations_share_the_total_storage_budget() {
+        let limits = JobLimits {
+            storage_limit_mib: 1_024,
+            max_running_jobs: 128,
+            running_job_reservation_mib: 256,
+        };
+        assert_eq!(limits.max_reserved_jobs(), 4);
+        assert_eq!(
+            JobLimits {
+                storage_limit_mib: 512,
+                ..limits
+            }
+            .max_reserved_jobs(),
+            2
+        );
+    }
+
+    #[test]
     fn registry_counts_fresh_reservations_and_reaps_crash_stale_ones() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join("jobs");
@@ -1282,7 +1348,17 @@ mod tests {
         let middle = terminal_job(&paths.jobs_dir, "j-000002", 2, 430 * 1024);
         let newest = terminal_job(&paths.jobs_dir, "j-000003", 3, 430 * 1024);
 
-        assert_eq!(reap(&paths, 1).unwrap(), 1);
+        assert_eq!(
+            reap(
+                &paths,
+                JobLimits {
+                    storage_limit_mib: 1,
+                    ..JobLimits::default()
+                }
+            )
+            .unwrap(),
+            1
+        );
         assert!(!oldest.exists());
         assert!(middle.exists());
         assert!(newest.exists());
@@ -1309,8 +1385,8 @@ mod tests {
         assert!(save(&paths, &settings).unwrap());
 
         assert!(!oldest.exists());
-        assert!(middle.exists());
-        assert!(newest.exists());
+        assert!(!middle.exists());
+        assert!(!newest.exists());
         assert!(running.exists());
         assert_eq!(
             crate::control::settings::load(&paths)
@@ -1335,7 +1411,17 @@ mod tests {
         std::fs::write(running.join("payload.bin"), vec![b'x'; 2 * 1024 * 1024]).unwrap();
         let finished = terminal_job(&paths.jobs_dir, "j-000002", 2, 512 * 1024);
 
-        assert_eq!(reap(&paths, 1).unwrap(), 1);
+        assert_eq!(
+            reap(
+                &paths,
+                JobLimits {
+                    storage_limit_mib: 1,
+                    ..JobLimits::default()
+                }
+            )
+            .unwrap(),
+            1
+        );
         assert!(running.exists());
         assert!(!finished.exists());
         assert!(matches!(

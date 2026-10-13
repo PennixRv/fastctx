@@ -305,7 +305,7 @@ fn output_quota_stops_log_and_index_growth_but_not_the_command_or_exit_status() 
     std::fs::create_dir_all(&workspace).unwrap();
     std::fs::write(
         home.join(".fastctx/config.toml"),
-        "schema_version = 1\n\n[fastshell]\nenabled = true\njob_storage_limit_mib = 1\n",
+        "schema_version = 1\n\n[fastshell]\nenabled = true\njob_storage_limit_mib = 1\nrunning_job_reservation_mib = 1\n",
     )
     .unwrap();
     let event_log = temp.path().join("runtime-events.log");
@@ -382,7 +382,7 @@ fn periodic_maintenance_reaps_finished_history_without_a_new_job_start() {
     std::fs::create_dir_all(&workspace).unwrap();
     std::fs::write(
         home.join(".fastctx/config.toml"),
-        "schema_version = 1\n\n[fastshell]\nenabled = true\njob_storage_limit_mib = 1\n",
+        "schema_version = 1\n\n[fastshell]\nenabled = true\njob_storage_limit_mib = 1\nrunning_job_reservation_mib = 1\n",
     )
     .unwrap();
     let event_log = temp.path().join("runtime-events.log");

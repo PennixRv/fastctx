@@ -225,7 +225,7 @@ impl JobManager {
             Ok(limits) => limits,
             Err(error) => return ToolResponse::error(error),
         };
-        if let Err(error) = store::reap(paths, limits.storage_limit_mib) {
+        if let Err(error) = store::reap(paths, limits) {
             return ToolResponse::error(error);
         }
         let (job_id, job_dir) = match store::reserve_job(&paths.jobs_dir) {
@@ -250,6 +250,15 @@ impl JobManager {
             return ToolResponse::error(format!(
                 "Too many running jobs: the limit is {} across all FastCtx sessions for the current user. Kill or wait out an existing job first.",
                 limits.max_running_jobs
+            ));
+        }
+        if active > limits.max_reserved_jobs() {
+            store::remove_reserved_job(&job_dir);
+            return ToolResponse::error(format!(
+                "Insufficient persistent storage reservation: the current {} MiB total limit and {} MiB per-running-job reservation allow {} concurrent jobs.",
+                limits.storage_limit_mib,
+                limits.running_job_reservation_mib,
+                limits.max_reserved_jobs(),
             ));
         }
 
@@ -282,7 +291,9 @@ impl JobManager {
             encoding: encoding.map(|encoding| encoding.label().to_string()),
             environment: environment.clone(),
             utf8_locale: utf8_locale.to_string(),
-            output_limit_bytes: limits.storage_limit_mib.saturating_mul(1024 * 1024),
+            output_limit_bytes: limits
+                .running_job_reservation_mib
+                .saturating_mul(1024 * 1024),
             origin: store::origin_snapshot(environment.cwd()),
         };
         match host::launch_supervisor(executable, &spec) {
@@ -1333,7 +1344,7 @@ pub(crate) fn summaries(paths: &ControlPaths) -> Result<Vec<JobSummary>, JobRegi
 pub(crate) fn reap_history(paths: &ControlPaths) -> Result<u64, String> {
     let _admission = admission::AdmissionGuard::acquire(paths)?;
     let limits = store::effective_limits(paths)?;
-    store::reap(paths, limits.storage_limit_mib)
+    store::reap(paths, limits)
 }
 
 fn source_tag(source_key: &str) -> String {
@@ -1399,7 +1410,7 @@ pub(crate) fn refresh_tail(
 pub(crate) fn reap(paths: &ControlPaths) -> Result<u64, String> {
     let _admission = admission::AdmissionGuard::acquire(paths)?;
     let limits = store::effective_limits(paths)?;
-    store::reap(paths, limits.storage_limit_mib)
+    store::reap(paths, limits)
 }
 
 pub(crate) fn acquire_unapply_admission(

@@ -25,6 +25,8 @@ pub(crate) const TOOL_BUDGET_EPOCH: u32 = 2;
 pub const DEFAULT_JOB_STORAGE_LIMIT_MIB: u64 = 1_024;
 /// Default current-user number of simultaneously running background jobs.
 pub const DEFAULT_MAX_RUNNING_JOBS: u64 = 128;
+/// Default persistent reservation for one running background job.
+pub const DEFAULT_RUNNING_JOB_RESERVATION_MIB: u64 = 256;
 /// Default number of background-job records returned by one `job_list` call.
 pub const DEFAULT_JOB_LIST_LIMIT: u64 = 20;
 /// Largest configurable page size accepted by `job_list`.
@@ -558,6 +560,9 @@ pub struct FastShellSettings {
     /// Maximum number of background jobs running across all FastCtx sessions.
     #[serde(deserialize_with = "deserialize_max_running_jobs")]
     pub max_running_jobs: u64,
+    /// Persistent storage reserved for each running job before terminal history is counted.
+    #[serde(deserialize_with = "deserialize_running_job_reservation")]
+    pub running_job_reservation_mib: u64,
     /// Default maximum records returned by `job_list`; explicit tool arguments override it once.
     #[serde(deserialize_with = "deserialize_job_list_limit")]
     pub job_list_limit: u64,
@@ -569,6 +574,7 @@ impl Default for FastShellSettings {
             enabled: false,
             job_storage_limit_mib: DEFAULT_JOB_STORAGE_LIMIT_MIB,
             max_running_jobs: DEFAULT_MAX_RUNNING_JOBS,
+            running_job_reservation_mib: DEFAULT_RUNNING_JOB_RESERVATION_MIB,
             job_list_limit: DEFAULT_JOB_LIST_LIMIT,
         }
     }
@@ -586,6 +592,13 @@ where
     D: serde::Deserializer<'de>,
 {
     deserialize_positive_or_default(deserializer, DEFAULT_MAX_RUNNING_JOBS)
+}
+
+fn deserialize_running_job_reservation<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    deserialize_positive_or_default(deserializer, DEFAULT_RUNNING_JOB_RESERVATION_MIB)
 }
 
 fn deserialize_job_list_limit<'de, D>(deserializer: D) -> Result<u64, D::Error>
