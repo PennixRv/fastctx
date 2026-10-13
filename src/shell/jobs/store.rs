@@ -1045,47 +1045,9 @@ pub(crate) fn clear_kill_request(directory: &Path) {
 
 pub(crate) fn reap(paths: &ControlPaths, limits: JobLimits) -> Result<u64, String> {
     let root = &paths.jobs_dir;
-    let entries = match fs::read_dir(root) {
-        Ok(entries) => entries,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
-        Err(error) => {
-            return Err(format!(
-                "Cannot inspect job storage {}: {error}",
-                display_path(root)
-            ));
-        }
-    };
-    let mut total = 0_u64;
-    for entry in entries {
-        let entry = entry.map_err(|error| {
-            format!("Cannot inspect job storage {}: {error}", display_path(root))
-        })?;
-        total = total.saturating_add(path_size(&entry.path())?);
-    }
-    let limit = limits.storage_limit_mib.saturating_mul(1024 * 1024);
     let registry = scan_registry(root)?;
-    let active = registry
-        .records
-        .iter()
-        .filter(|record| record.status.is_running())
-        .count() as u64
-        + registry.pending_reservations;
-    let active_actual = registry
-        .records
-        .iter()
-        .filter(|record| record.status.is_running())
-        .map(|record| path_size(&record.directory).unwrap_or(0))
-        .sum::<u64>();
-    let pending_actual = fs::read_dir(root)
-        .into_iter()
-        .flatten()
-        .filter_map(Result::ok)
-        .filter(|entry| valid_job_id(&entry.file_name().to_string_lossy()))
-        .filter(|entry| !entry.path().join(META_FILE).exists())
-        .map(|entry| path_size(&entry.path()).unwrap_or(0))
-        .sum::<u64>();
-    let terminal_total = total.saturating_sub(active_actual.saturating_add(pending_actual));
-    let reserved = active.saturating_mul(limits.reservation_bytes());
+    let (_, reserved, terminal_total) = storage_accounting(root, &registry, limits)?;
+    let limit = limits.storage_limit_mib.saturating_mul(1024 * 1024);
     if terminal_total.saturating_add(reserved) <= limit {
         return Ok(0);
     }
@@ -1103,7 +1065,7 @@ pub(crate) fn reap(paths: &ControlPaths, limits: JobLimits) -> Result<u64, Strin
         if terminal_total <= terminal_target {
             break;
         }
-        let bytes = path_size(&record.directory).unwrap_or(0);
+        let bytes = path_size(&record.directory)?;
         match fs::remove_dir_all(&record.directory) {
             Ok(()) => {
                 terminal_total = terminal_total.saturating_sub(bytes);
@@ -1122,6 +1084,52 @@ pub(crate) fn reap(paths: &ControlPaths, limits: JobLimits) -> Result<u64, Strin
         }
     }
     Ok(removed)
+}
+
+pub(crate) fn storage_accounting(
+    root: &Path,
+    registry: &RegistrySnapshot,
+    limits: JobLimits,
+) -> Result<(u64, u64, u64), String> {
+    let entries = match fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok((0, 0, 0)),
+        Err(error) => {
+            return Err(format!(
+                "Cannot inspect job storage {}: {error}",
+                display_path(root)
+            ));
+        }
+    };
+    let mut total = 0_u64;
+    let mut reserved = 0_u64;
+    let mut terminal = 0_u64;
+    let running = registry
+        .records
+        .iter()
+        .filter(|record| record.status.is_running())
+        .map(|record| record.directory.clone())
+        .collect::<BTreeSet<_>>();
+    for entry in entries {
+        let entry = entry.map_err(|error| {
+            format!("Cannot inspect job storage {}: {error}", display_path(root))
+        })?;
+        let directory = entry.path();
+        let bytes = path_size(&directory)?;
+        total = total.saturating_add(bytes);
+        if running.contains(&directory)
+            || (valid_job_id(&entry.file_name().to_string_lossy())
+                && !directory
+                    .join(META_FILE)
+                    .try_exists()
+                    .map_err(|error| error.to_string())?)
+        {
+            reserved = reserved.saturating_add(bytes.max(limits.reservation_bytes()));
+        } else {
+            terminal = terminal.saturating_add(bytes);
+        }
+    }
+    Ok((total, reserved, terminal))
 }
 
 fn path_size(path: &Path) -> Result<u64, String> {
@@ -1186,7 +1194,8 @@ fn base36(mut value: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        JobLimits, open_log, read_log_delta, reap, scan_registry, valid_job_id, write_atomic_json,
+        JobLimits, open_log, read_log_delta, reap, scan_registry, storage_accounting, valid_job_id,
+        write_atomic_json,
     };
     use crate::control::paths::ControlPaths;
     use crate::control::settings::{FastCtxSettings, save};
@@ -1320,6 +1329,54 @@ mod tests {
             .max_reserved_jobs(),
             2
         );
+    }
+
+    #[test]
+    fn new_pending_reservation_reclaims_history_before_admission() {
+        let temp = tempfile::tempdir().unwrap();
+        let paths = ControlPaths::for_home(temp.path());
+        let finished = terminal_job(&paths.jobs_dir, "j-000001", 1, 512 * 1024);
+        let limits = JobLimits {
+            storage_limit_mib: 1,
+            running_job_reservation_mib: 1,
+            ..JobLimits::default()
+        };
+        assert_eq!(reap(&paths, limits).unwrap(), 0);
+        std::fs::create_dir(paths.jobs_dir.join("j-000002")).unwrap();
+        assert_eq!(reap(&paths, limits).unwrap(), 1);
+        assert!(!finished.exists());
+        let registry = scan_registry(&paths.jobs_dir).unwrap();
+        let (_, reserved, terminal) =
+            storage_accounting(&paths.jobs_dir, &registry, limits).unwrap();
+        assert_eq!(reserved, 1024 * 1024);
+        assert_eq!(terminal, 0);
+    }
+
+    #[test]
+    fn accounting_preserves_oversized_running_usage_and_unknown_storage() {
+        let temp = tempfile::tempdir().unwrap();
+        let paths = ControlPaths::for_home(temp.path());
+        let running = paths.jobs_dir.join("j-000001");
+        std::fs::create_dir_all(&running).unwrap();
+        write_atomic_json(
+            &running.join(META_FILE),
+            &metadata(process_identity(std::process::id()).unwrap(), 1),
+        )
+        .unwrap();
+        std::fs::write(running.join("payload"), vec![b'x'; 2 * 1024 * 1024]).unwrap();
+        std::fs::write(paths.jobs_dir.join("unknown"), "retain").unwrap();
+        let limits = JobLimits {
+            storage_limit_mib: 2,
+            running_job_reservation_mib: 1,
+            ..JobLimits::default()
+        };
+        assert_eq!(reap(&paths, limits).unwrap(), 0);
+        let registry = scan_registry(&paths.jobs_dir).unwrap();
+        let (_, reserved, terminal) =
+            storage_accounting(&paths.jobs_dir, &registry, limits).unwrap();
+        assert!(reserved > 2 * 1024 * 1024);
+        assert_eq!(terminal, 6);
+        assert!(running.exists());
     }
 
     #[test]

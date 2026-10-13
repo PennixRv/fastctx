@@ -26,24 +26,24 @@
     "execution_class": "direct",
     "delivery_mode": "change_bearing",
     "planning": {
-      "revision": 1,
+      "revision": 2,
       "seal": {
-        "revision": 1,
+        "revision": 2,
         "task_id": "job-retention-delivery",
         "task_name": "10-13-job-retention-delivery",
         "documents": [
           "prd.md"
         ],
         "document_digests": {
-          "prd.md": "c8231cdf6b6c1d0d2689efc5fdc086aac075dec5f9bc5b7747d599c1060cdb75"
+          "prd.md": "00460f91988d4609957e5606600e98594c0d42b1de76c0a740be1c1b57906622"
         },
         "execution_class": "direct",
         "delivery_mode": "change_bearing",
-        "sealed_at": "2026-10-13T12:54:21.511488+00:00"
+        "sealed_at": "2026-10-13T13:05:57.386684+00:00"
       },
-      "approved_revision": 1,
-      "approval_basis": "继承根任务 revision 2 已明确批准的相同修订包",
-      "approved_at": "2026-10-13T12:54:21.613014+00:00"
+      "approved_revision": 2,
+      "approval_basis": "根任务 revision 2 已批准的 R4 严格共享容量合同；本次仅补齐同范围验收遗漏",
+      "approved_at": "2026-10-13T13:05:57.513679+00:00"
     }
   }
 }

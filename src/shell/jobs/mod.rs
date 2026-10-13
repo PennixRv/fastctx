@@ -225,13 +225,14 @@ impl JobManager {
             Ok(limits) => limits,
             Err(error) => return ToolResponse::error(error),
         };
-        if let Err(error) = store::reap(paths, limits) {
-            return ToolResponse::error(error);
-        }
         let (job_id, job_dir) = match store::reserve_job(&paths.jobs_dir) {
             Ok(reservation) => reservation,
             Err(error) => return ToolResponse::error(error),
         };
+        if let Err(error) = store::reap(paths, limits) {
+            store::remove_reserved_job(&job_dir);
+            return ToolResponse::error(error);
+        }
         let registry = match store::scan_registry(&paths.jobs_dir) {
             Ok(registry) => registry,
             Err(error) => {
@@ -252,11 +253,19 @@ impl JobManager {
                 limits.max_running_jobs
             ));
         }
-        if active > limits.max_reserved_jobs() {
+        let (actual, reserved, terminal) =
+            match store::storage_accounting(&paths.jobs_dir, &registry, limits) {
+                Ok(usage) => usage,
+                Err(error) => {
+                    store::remove_reserved_job(&job_dir);
+                    return ToolResponse::error(error);
+                }
+            };
+        let budget = limits.storage_limit_mib.saturating_mul(1024 * 1024);
+        if active > limits.max_reserved_jobs() || reserved.saturating_add(terminal) > budget {
             store::remove_reserved_job(&job_dir);
             return ToolResponse::error(format!(
-                "Insufficient persistent storage reservation: the current {} MiB total limit and {} MiB per-running-job reservation allow {} concurrent jobs.",
-                limits.storage_limit_mib,
+                "Insufficient persistent storage reservation: budget {budget} bytes, actual {actual} bytes, active reservations/usage {reserved} bytes, retained terminal/other storage {terminal} bytes after reaping; {} MiB per-running-job reservation allows at most {} concurrent jobs. Wait for a running job to finish or adjust the owner storage limits, then retry.",
                 limits.running_job_reservation_mib,
                 limits.max_reserved_jobs(),
             ));

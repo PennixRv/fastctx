@@ -408,6 +408,56 @@ fn periodic_maintenance_reaps_finished_history_without_a_new_job_start() {
 }
 
 #[test]
+fn reservations_are_shared_across_sessions_and_reclaim_before_replacement() {
+    let _serial = runtime_guard();
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    let workspace = temp.path().join("workspace");
+    std::fs::create_dir_all(home.join(".fastctx")).unwrap();
+    std::fs::create_dir_all(&workspace).unwrap();
+    std::fs::write(home.join(".fastctx/config.toml"), "schema_version = 1\n\n[fastshell]\nenabled = true\njob_storage_limit_mib = 4\nrunning_job_reservation_mib = 1\n").unwrap();
+    let events = temp.path().join("events.log");
+    let mut first = McpSession::start(server_command(&home, &workspace, &events));
+    let mut second = McpSession::start(server_command(&home, &workspace, &events));
+    let mut jobs = Vec::new();
+    for index in 0..4 {
+        let session = if index % 2 == 0 {
+            &mut first
+        } else {
+            &mut second
+        };
+        let response = session.call(
+            "run_background",
+            serde_json::json!({"command":"sleep 30", "login_shell":false}),
+        );
+        jobs.push(started_job_id(mcp_text(&response)));
+    }
+    let rejected = second.call(
+        "run_background",
+        serde_json::json!({"command":"printf rejected", "login_shell":false}),
+    );
+    assert!(
+        mcp_text(&rejected).contains("Insufficient persistent storage reservation"),
+        "{rejected:?}"
+    );
+    first.call("job_kill", serde_json::json!({"job_id":jobs[0]}));
+    let old = home.join(".fastctx/jobs").join(&jobs[0]);
+    wait_for_file(&old.join("exit.json"), PROCESS_DEADLINE);
+    let replacement = second.call(
+        "run_background",
+        serde_json::json!({"command":"printf replacement", "login_shell":false}),
+    );
+    started_job_id(mcp_text(&replacement));
+    assert!(
+        !old.exists(),
+        "terminal history must be reclaimed for the fourth reservation"
+    );
+    for job in &jobs[1..] {
+        first.call("job_kill", serde_json::json!({"job_id":job}));
+    }
+}
+
+#[test]
 fn build_id_isolation_keeps_old_and_new_control_centers_independent() {
     let _serial = runtime_guard();
     let temp = tempfile::tempdir().unwrap();

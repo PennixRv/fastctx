@@ -7,11 +7,12 @@
 ## Requirements
 
 - 记录已批准根任务 R4 的 1 GiB 总预算、256 MiB running reservation、跨进程 admission、终态回收与 drain/no-persist 交付。
-- 当前剩余变更只由 cargo-about 0.9.0 刷新许可清单自身版本；不增加依赖或更改运行逻辑。
+- 许可清单已刷新；验收复核补齐新 pending reservation 纳入终态回收的时点、旧大作业实际占用保护和准入错误回执，不增加依赖。
 
 ## Acceptance Criteria
 
-- [ ] 已发布 0.2.25、本地完整 cargo test 通过且发布成功可核验。
+- [ ] 追加修复发布 0.2.26，本地完整 cargo test 通过且发布成功可核验；0.2.25 仅为中间版本。
+- [ ] 新预留先计入账本再回收，实际占用/活动 charge/终态占用超预算时拒绝准入，未知状态不当作空闲；运行作业保留。
 - [ ] 许可清单与 Cargo.lock 一致，CI 失败原因处理，原生 lifecycle 安装/核验结果回写根任务。
 
 ## Notes
