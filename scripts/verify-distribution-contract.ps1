@@ -1,6 +1,22 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $cargoVersion = (Select-String -LiteralPath (Join-Path $root "Cargo.toml") -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
+$manifests = @(Get-ChildItem -LiteralPath (Join-Path $root "packages") -Filter package.json -Recurse -File |
+    ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json })
+$packageNames = @($manifests | ForEach-Object { $_.name })
+foreach ($manifest in $manifests) {
+    if ($manifest.version -ne $cargoVersion) {
+        throw "Npm package $($manifest.name) version $($manifest.version) must match Cargo $cargoVersion"
+    }
+    foreach ($dependencies in @($manifest.dependencies, $manifest.optionalDependencies)) {
+        if ($null -eq $dependencies) { continue }
+        foreach ($dependency in $dependencies.PSObject.Properties) {
+            if ($dependency.Name -in $packageNames -and $dependency.Value -ne $cargoVersion) {
+                throw "Npm dependency $($manifest.name) -> $($dependency.Name) must use $cargoVersion, got $($dependency.Value)"
+            }
+        }
+    }
+}
 $tracked = @(& git -C $root ls-files)
 if ($LASTEXITCODE -ne 0) {
     throw "Cannot inspect the public git tree"
