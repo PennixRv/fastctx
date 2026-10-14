@@ -1,6 +1,6 @@
 {
   "name": "@pennixrv/fastctx",
-  "version": "0.2.26",
+  "version": "0.2.28",
   "description": "FastCtx — fast, context-efficient repository tools for AI agents.",
   "author": "PennixRv",
   "license": "Apache-2.0",
