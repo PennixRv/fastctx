@@ -30,3 +30,11 @@
 - 已统一 Cargo、lock 和七个 npm 清单为 `0.2.28`，提交 `117bb1375e87c19ad51caa4c5548073454c77184` 并推送。`v0.2.27` 失败 tag 保留，不改写；新发布运行为 https://github.com/PennixRv/fastctx/actions/runs/38577164882 。
 - `v0.2.28` 五个平台构建全部成功，但 publish-release 的本地 npm 安装验证发现主包 optionalDependencies 和兼容包 dependencies 仍指向 `0.2.26`；尚未进入 npm 发布或 GitHub Release 创建。
 - 已统一 `0.2.29` 的 Cargo、七个 npm 包及所有包内引用，并在既有 verify-distribution-contract.ps1 加入版本一致性检查。独立本地版本核验 7/7 通过；本机没有 pwsh，PowerShell 门由现有 CI 执行，不用等效静态核验冒充其执行结果。
+
+## 重启后运行验收
+
+2026-10-14 重启当前 Codex 会话后，当前 FastCtx MCP 服务进程由稳定入口 `/home/penn/.fastctx/bin/fastctx` 启动，进程和命令版本均为 `0.2.29`。当前会话直接调用 `grep`、`glob`、批量 `inspect_local_file` 和分页 `inspect_local_file` 均通过；服务返回的精确 `offset` 被用于续读并达到 `Complete`，没有依赖下一用户轮次。
+
+新进程探针 `/tmp/fastctx-installed-runtime-check.json` 为 `ok=true`：同一连接并发大响应均完整返回，6000 行正文和 6001 行分页正文连续交付为 3 页，批量读取通过；规范参数成功，顶层/批量字段误用和 `run.max_output_tokens` 错误均在解析边界给出诊断，错误命令未执行。`fastctx status` 的应用配置、安装二进制、MCP contract 和 AGENTS guidance 均为 PASS；其中 model-side tool surface 仍是 FastCtx 无法自观测的 INFO，本次当前会话的直接 MCP 调用作为实际宿主入口证据。
+
+最终发布 `v0.2.29`、五平台/registry/包引用一致性、Pennix 安装集合和根侧 8/8 离线集成已在根任务记录；当前源工作树 clean，`origin/main` 为 `9d655614a326bf543d81697a747bc230259e0c19`。旧会话进程的生命周期仍以其会话退出为准，不把历史进程与本次新连接混为一谈。
