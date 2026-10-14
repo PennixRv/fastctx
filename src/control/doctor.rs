@@ -1,6 +1,5 @@
 //! Diagnosable Status/Doctor checks and a real stdio MCP handshake.
 
-use crate::context_guard::INNER_COMPACTION_BUFFER;
 use crate::control::agents;
 use crate::control::codex_config::{self, ExpectedConfig};
 use crate::control::paths::ControlPaths;
@@ -379,7 +378,7 @@ fn check_output_guard(
             DoctorCheck::info(
                 "Provider and compaction",
                 format!(
-                    "{} Guarded protection is explicitly disabled. A large FastCtx turn can cross the remaining compaction margin, and FastCtx cannot make the provider's catalog, usage, compaction, or context-error contract correct.",
+                    "{} Provider compatibility protection is explicitly disabled. FastCtx keeps the selected tier but cannot verify the provider's catalog, usage, compaction, or context-error contract.",
                     detection.detail
                 ),
             )
@@ -396,30 +395,27 @@ fn check_output_guard(
                     DoctorCheck::pass(
                         "Provider and compaction",
                         format!(
-                            "{} Guarded is active: host limit {}, FastCtx burst budget {}, below Codex 0.147.0's {}-token inner compaction buffer. This limits FastCtx's aggregate turn output but cannot verify the other relay contracts.",
-                            detection.detail,
-                            effective.host_limit,
-                            effective.fastctx_budget,
-                            INNER_COMPACTION_BUFFER
+                            "{} Guarded is active with the selected host limit {} and FastCtx budget {}. Each response remains individually bounded; no shared per-turn pool is applied, and the other relay contracts remain unverifiable.",
+                            detection.detail, effective.host_limit, effective.fastctx_budget
                         ),
                     )
                 }
                 Some(record) => DoctorCheck::fail(
                     "Provider and compaction",
                     format!(
-                        "{} New runtime sessions are constrained to Guarded, but the Apply receipt still records host/global limits {}/{} instead of {}/{}.",
+                        "{} New runtime sessions use the selected tier, but the Apply receipt still records host/global limits {}/{} instead of {}/{}.",
                         detection.detail,
                         record.tool_output_token_limit,
                         record.fastctx_token_budget,
                         effective.host_limit,
                         effective.fastctx_budget
                     ),
-                    "Run fastctx apply to preview and write the Guarded host and server limits into Codex.",
+                    "Run fastctx apply to preview and write the selected host and server limits into Codex.",
                 ),
                 None => DoctorCheck::info(
                     "Provider and compaction",
                     format!(
-                        "{} New runtime sessions use Guarded automatically; run fastctx apply to write host limit {} and FastCtx budget {} into Codex.",
+                        "{} New runtime sessions use the selected tier; run fastctx apply to write host limit {} and FastCtx budget {} into Codex.",
                         detection.detail, effective.host_limit, effective.fastctx_budget
                     ),
                 ),
@@ -445,7 +441,7 @@ fn check_output_guard(
                 Some(_) => DoctorCheck::info(
                     "Provider and compaction",
                     format!(
-                        "{} Guarded is no longer required. Run fastctx apply to restore the selected {} tier (host limit {}, FastCtx budget {}).",
+                        "{} Provider protection is no longer required. Run fastctx apply to confirm the selected {} tier (host limit {}, FastCtx budget {}).",
                         detection.detail,
                         settings.tier.display_name(),
                         effective.host_limit,
@@ -792,7 +788,7 @@ fn check_drift(
                 {
                     pending.push(match effective.mode {
                         EffectiveOutputMode::SelectedTier => "the current tier limits",
-                        EffectiveOutputMode::Guarded => "the current provider's Guarded limits",
+                        EffectiveOutputMode::Guarded => "the current provider-compatible limits",
                     });
                 }
                 if settings.tier != record.tier {

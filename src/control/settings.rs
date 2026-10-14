@@ -208,7 +208,7 @@ pub struct UpdateSettings {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default)]
 pub struct OutputGuardSettings {
-    /// Whether third-party providers are constrained to the Guarded output policy.
+    /// Whether local or unverified relay routes use provider compatibility protection.
     pub enabled: bool,
 }
 

@@ -23,7 +23,7 @@ pub struct ApplyOptions {
     pub tier: Tier,
     /// Five long-output tools' advanced overrides; unset entries follow the tier.
     pub tool_budgets: ToolBudgetPreferences,
-    /// Whether local or unverified relay providers should use the Guarded output policy.
+    /// Whether local or unverified relay providers should use compatibility protection.
     pub output_guard_enabled: bool,
     /// Whether the optional shell tool group should be published.
     pub fastshell_enabled: bool,

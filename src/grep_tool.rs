@@ -63,7 +63,7 @@ pub enum OutputMode {
 }
 
 /// Parameters for the grep tool.
-#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, JsonSchema)]
 pub struct GrepRequest {
     /// The regular expression to search for (Rust regex syntax; escape literal braces like `interface\{\}`).
     pub pattern: String,
@@ -104,6 +104,59 @@ pub struct GrepRequest {
     pub encoding: Option<String>,
     /// Directory target: WHATWG encoding to assume only for files auto-detection can't determine — never overrides BOM, valid UTF-8, or already-resolved files. Strict-decoded; files that also fail under it stay in the skip report.
     pub fallback_encoding: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GrepRequestWire {
+    pattern: String,
+    path: Option<String>,
+    glob: Option<GlobPatterns>,
+    #[serde(rename = "type")]
+    file_type: Option<String>,
+    output_mode: Option<OutputMode>,
+    case_insensitive: Option<bool>,
+    line_numbers: Option<bool>,
+    only_matching: Option<bool>,
+    before_context: Option<usize>,
+    after_context: Option<usize>,
+    context: Option<usize>,
+    multiline: Option<bool>,
+    head_limit: Option<usize>,
+    offset: Option<usize>,
+    encoding: Option<String>,
+    fallback_encoding: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for GrepRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = GrepRequestWire::deserialize(deserializer).map_err(|error| {
+            serde::de::Error::custom(format!(
+                "grep parameters: {error}. The required search field is 'pattern'; use published field names exactly."
+            ))
+        })?;
+        Ok(Self {
+            pattern: wire.pattern,
+            path: wire.path,
+            glob: wire.glob,
+            file_type: wire.file_type,
+            output_mode: wire.output_mode,
+            case_insensitive: wire.case_insensitive,
+            line_numbers: wire.line_numbers,
+            only_matching: wire.only_matching,
+            before_context: wire.before_context,
+            after_context: wire.after_context,
+            context: wire.context,
+            multiline: wire.multiline,
+            head_limit: wire.head_limit,
+            offset: wire.offset,
+            encoding: wire.encoding,
+            fallback_encoding: wire.fallback_encoding,
+        })
+    }
 }
 
 struct SearchOutcome {
@@ -2446,4 +2499,20 @@ fn normalize_multiline_pattern(pattern: &str) -> String {
         }
     }
     output
+}
+
+#[cfg(test)]
+mod parameter_tests {
+    use super::GrepRequest;
+
+    #[test]
+    fn invalid_grep_parameters_identify_the_required_pattern_field() {
+        let error = serde_json::from_value::<GrepRequest>(serde_json::json!({
+            "query": "needle"
+        }))
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("grep parameters"));
+        assert!(error.contains("pattern"));
+    }
 }

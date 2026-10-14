@@ -440,7 +440,7 @@ impl App {
         guard_i18n::messages(language)
     }
 
-    /// Whether the visible provider currently locks the effective output tier to Guarded.
+    /// Whether provider compatibility protection is active for the visible route.
     pub(crate) fn output_guard_active(&self) -> bool {
         self.config_draft.output_guard_enabled && self.provider_detection.requires_guard()
     }

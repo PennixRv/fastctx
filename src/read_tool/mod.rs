@@ -53,8 +53,7 @@ enum ViewMode {
 }
 
 /// Parameters for the file-inspection tool; offset is a one-based line number.
-#[derive(Clone, Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, JsonSchema)]
 pub struct ReadRequest {
     /// File to inspect; mutually exclusive with files.
     #[schemars(description = crate::model_guidance::local_path_description(
@@ -86,6 +85,42 @@ pub struct ReadRequest {
     /// "auto" (default) picks the channel by file type; "hex" returns a paged hex dump of the raw bytes of any file — the way to inspect binary files.
     #[schemars(with = "Option<ViewMode>")]
     pub view: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReadRequestWire {
+    file_path: Option<String>,
+    files: Option<Vec<BatchReadEntry>>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+    pages: Option<String>,
+    pdf_mode: Option<String>,
+    encoding: Option<String>,
+    view: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for ReadRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = ReadRequestWire::deserialize(deserializer).map_err(|error| {
+            serde::de::Error::custom(format!(
+                "inspect_local_file parameters: {error}. Use 'file_path' for one file or 'files' with entries whose field is 'path'."
+            ))
+        })?;
+        Ok(Self {
+            file_path: wire.file_path,
+            files: wire.files,
+            offset: wire.offset,
+            limit: wire.limit,
+            pages: wire.pages,
+            pdf_mode: wire.pdf_mode,
+            encoding: wire.encoding,
+            view: wire.view,
+        })
+    }
 }
 
 /// One text range in a batch inspection request.
@@ -242,4 +277,21 @@ fn binary_error_message(path_display: &str, binary_type: Option<&str>) -> String
     format!(
         "Cannot read binary file as text: {path_display}{kind}. Use view=\"hex\" to inspect its raw bytes."
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ReadRequest;
+
+    #[test]
+    fn invalid_read_parameters_identify_the_canonical_path_fields() {
+        let error = serde_json::from_value::<ReadRequest>(serde_json::json!({
+            "path": "/tmp/file"
+        }))
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("inspect_local_file parameters"));
+        assert!(error.contains("file_path"));
+        assert!(error.contains("files"));
+    }
 }

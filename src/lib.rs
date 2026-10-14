@@ -5,7 +5,6 @@ pub(crate) mod binary;
 pub(crate) mod bounded_sort;
 pub mod budget;
 pub mod cli;
-pub(crate) mod context_guard;
 pub mod control;
 pub mod edit;
 mod edit_server;

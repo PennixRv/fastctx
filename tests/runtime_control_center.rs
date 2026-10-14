@@ -224,7 +224,7 @@ fn connection_context_keeps_cwd_path_budget_cursor_and_cancellation_isolated() {
 }
 
 #[test]
-fn runtime_guard_tightens_without_apply_and_releases_on_the_next_connection() {
+fn runtime_guard_uses_selected_tier_without_a_shared_turn_pool() {
     let _serial = runtime_guard();
     let temp = tempfile::tempdir().unwrap();
     let home = temp.path().join("home");
@@ -261,10 +261,28 @@ fn runtime_guard_tightens_without_apply_and_releases_on_the_next_connection() {
     let tokenizer = tiktoken_rs::o200k_base_singleton();
     let guarded_tokens = tokenizer.encode_ordinary(guarded_text).len();
     assert!(
-        guarded_tokens <= 9_000,
-        "guarded response used {guarded_tokens} tokens"
+        guarded_tokens > 9_000,
+        "guarded response still used the removed shared pool: {guarded_tokens} tokens"
     );
-    assert!(guarded_text.contains("(Partial:"), "{guarded_text}");
+    assert!(
+        guarded_text.contains("(Partial:") || guarded_text.contains("Complete:"),
+        "{guarded_text}"
+    );
+
+    let second_guarded = guarded.call(
+        "run",
+        serde_json::json!({"command": output_command, "login_shell": false}),
+    );
+    let second_guarded_text = mcp_text(&second_guarded);
+    let second_guarded_tokens = tokenizer.encode_ordinary(second_guarded_text).len();
+    assert!(
+        second_guarded_tokens > 9_000,
+        "second guarded={second_guarded_tokens}"
+    );
+    assert!(
+        second_guarded_text.contains("(Partial:") || second_guarded_text.contains("Complete:"),
+        "{second_guarded_text}"
+    );
 
     std::fs::create_dir_all(home.join(".fastctx")).unwrap();
     std::fs::write(
@@ -284,9 +302,11 @@ fn runtime_guard_tightens_without_apply_and_releases_on_the_next_connection() {
     let unguarded_tokens = tokenizer
         .encode_ordinary(mcp_text(&unguarded_response))
         .len();
+    assert!(unguarded_tokens > 9_000, "unguarded={unguarded_tokens}");
+    let unguarded_text = mcp_text(&unguarded_response);
     assert!(
-        unguarded_tokens > guarded_tokens + 2_000,
-        "guarded={guarded_tokens}, unguarded={unguarded_tokens}"
+        unguarded_text.contains("(Partial:") || unguarded_text.contains("Complete:"),
+        "{unguarded_text}"
     );
     assert_eq!(host_start_pids(&event_log).len(), 1);
 

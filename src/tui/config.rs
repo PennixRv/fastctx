@@ -517,7 +517,6 @@ pub(crate) struct BudgetValue {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ConfigValue {
     Tier(Tier),
-    GuardedTier(Tier),
     Budget(BudgetValue),
     Toggle(bool),
     Number(u64),
@@ -560,10 +559,7 @@ impl OutputConfigDraft {
     }
 
     /// Tier default for one tool.
-    const fn budget_default(self, item: ConfigItemId, guarded: bool) -> ToolBudgetLevel {
-        if guarded {
-            return ToolBudgetLevel::Inherit;
-        }
+    const fn budget_default(self, item: ConfigItemId, _guarded: bool) -> ToolBudgetLevel {
         let defaults = self.tier.default_budgets();
         match item {
             ConfigItemId::GrepBudget => defaults.grep,
@@ -578,11 +574,7 @@ impl OutputConfigDraft {
     fn budget_value(self, item: ConfigItemId, guarded: bool) -> BudgetValue {
         let stored = self.budget_override(item);
         let level = stored.unwrap_or_else(|| self.budget_default(item, guarded));
-        let global = if guarded {
-            crate::control::provider::GUARDED_FASTCTX_BUDGET
-        } else {
-            self.tier.fastctx_budget()
-        };
+        let global = self.tier.fastctx_budget();
         BudgetValue {
             level,
             explicit: stored.is_some(),
@@ -642,10 +634,9 @@ impl ConfigDraft {
         settings.fastedit.enabled = false;
     }
 
-    /// Returns one value under the environment-derived Guarded mode.
+    /// Returns one value under the drafted tier and explicit provider settings.
     pub(crate) fn value_with_guard(self, item: ConfigItemId, guarded: bool) -> ConfigValue {
         match item {
-            ConfigItemId::OutputTier if guarded => ConfigValue::GuardedTier(self.output.tier),
             ConfigItemId::OutputTier => ConfigValue::Tier(self.output.tier),
             ConfigItemId::OutputGuard => ConfigValue::Toggle(self.output_guard_enabled),
             ConfigItemId::ReplaceFileLimit => {
@@ -685,17 +676,17 @@ impl ConfigDraft {
         }
     }
 
-    /// Adjusts one item while respecting an environment-derived tier lock.
-    pub(crate) fn adjust_with_guard(&mut self, item: ConfigItemId, forward: bool, guarded: bool) {
+    /// Adjusts one item under the current provider settings.
+    pub(crate) fn adjust_with_guard(&mut self, item: ConfigItemId, forward: bool, _guarded: bool) {
         match item {
-            ConfigItemId::OutputTier if !guarded => {
+            ConfigItemId::OutputTier => {
                 self.output.tier = if forward {
                     self.output.tier.next()
                 } else {
                     self.output.tier.previous()
                 };
             }
-            ConfigItemId::OutputTier | ConfigItemId::OutputGuard => {}
+            ConfigItemId::OutputGuard => {}
             ConfigItemId::ReplaceFileLimit => cycle_i64_preset(
                 &mut self.replace_file_limit_mib,
                 &[64, 128, 256, 512, 1_024, 2_048, 4_096],
@@ -757,7 +748,7 @@ impl ConfigDraft {
     /// Resolves what a candidate editor entry would become, so the editor can show its effect
     /// before anything is saved. Routed through the real setter so the preview cannot drift from
     /// what submitting actually does.
-    /// Resolves an editor entry under the environment-derived Guarded mode.
+    /// Resolves an editor entry under the drafted tier.
     pub(crate) fn preview_tool_budget_with_guard(
         self,
         item: ConfigItemId,

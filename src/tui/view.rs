@@ -1106,32 +1106,6 @@ fn render_config(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             Line::raw(""),
             Line::styled(messages.tier_explainer, Style::default().fg(theme::muted())),
         ],
-        ConfigValue::GuardedTier(selected_tier) => vec![
-            Line::from(vec![
-                Span::styled(
-                    "Guarded",
-                    Style::default()
-                        .fg(theme::warning())
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(
-                    format!("  ·  {}", selected_tier.display_name()),
-                    Style::default().fg(theme::muted()),
-                ),
-            ]),
-            Line::styled(
-                app.guard_messages().locked_note,
-                Style::default().fg(theme::fg()),
-            ),
-            Line::raw(""),
-            Line::styled(
-                format!(
-                    "tool_output_token_limit {} · FASTCTX_TOKEN_BUDGET {}",
-                    effective_output.host_limit, effective_output.fastctx_budget
-                ),
-                Style::default().fg(theme::muted()),
-            ),
-        ],
         ConfigValue::Budget(budget) => {
             let mut lines = vec![Line::from(vec![
                 Span::styled(
@@ -1172,8 +1146,6 @@ fn render_config(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
             lines.push(Line::styled(
                 if budget.explicit {
                     app.config_messages().budget_explicit_note
-                } else if guarded {
-                    app.guard_messages().budget_follows_guarded_note
                 } else {
                     app.config_messages().budget_follows_tier_note
                 },
@@ -2343,13 +2315,6 @@ fn config_value_line(app: &App, item: ConfigItemId, selected: bool) -> Line<'sta
             format!("Enter · {}", config_value_label(app, item, value)),
             Style::default()
                 .fg(config_value_color(value))
-                .add_modifier(Modifier::BOLD),
-        )
-    } else if matches!(value, ConfigValue::GuardedTier(_)) {
-        Line::styled(
-            "Guarded",
-            Style::default()
-                .fg(theme::warning())
                 .add_modifier(Modifier::BOLD),
         )
     } else {
@@ -3541,7 +3506,6 @@ fn config_narrow_summary(app: &App) -> String {
 fn config_value_label(app: &App, item: ConfigItemId, value: ConfigValue) -> String {
     match value {
         ConfigValue::Tier(tier) => tier.display_name().to_string(),
-        ConfigValue::GuardedTier(_) => "Guarded".to_string(),
         ConfigValue::Budget(budget) if budget.explicit => budget.level.label(),
         // A share that follows the tier says so instead of showing the number it happens to
         // resolve to: the two rendered identically, so nothing on the row distinguished the
@@ -3573,7 +3537,6 @@ fn config_value_label(app: &App, item: ConfigItemId, value: ConfigValue) -> Stri
 fn config_value_color(value: ConfigValue) -> Color {
     match value {
         ConfigValue::Tier(tier) => tier_color(tier),
-        ConfigValue::GuardedTier(_) => theme::warning(),
         // An explicit share is highlighted so the rows somebody has overridden stand apart from
         // the ones that will keep tracking the tier.
         ConfigValue::Budget(budget) if budget.explicit => theme::accent(),
@@ -3903,7 +3866,7 @@ mod tests {
             let mut terminal = Terminal::new(backend).unwrap();
             terminal.draw(|frame| render(frame, &mut app)).unwrap();
             let text = buffer_text(&terminal);
-            for expected in ["Guarded", "10000", "9000"] {
+            for expected in ["Standard", "60000", "54000"] {
                 assert!(
                     contains_visible_text(&text, expected),
                     "{} missing {expected}\n{text}",
@@ -3918,7 +3881,7 @@ mod tests {
                 let mut terminal = Terminal::new(backend).unwrap();
                 terminal.draw(|frame| render(frame, &mut app)).unwrap();
                 let text = buffer_text(&terminal);
-                for expected in ["Guarded", "✕", "✓"] {
+                for expected in ["✕", "✓"] {
                     assert!(
                         contains_visible_text(&text, expected),
                         "{} missing {expected} at {width}x{height}\n{text}",

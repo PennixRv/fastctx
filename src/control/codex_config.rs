@@ -27,9 +27,9 @@ pub struct ExpectedConfig {
     pub command: String,
     /// Host output tier.
     pub tier: Tier,
-    /// Effective host output limit; may be Guarded independently from the selected tier.
+    /// Effective host output limit after provider compatibility resolution.
     pub host_limit: i64,
-    /// Effective global FastCtx budget; may be Guarded independently from the selected tier.
+    /// Effective global FastCtx budget after provider compatibility resolution.
     pub fastctx_budget: usize,
     /// Five long-output tools' relative budgets.
     pub tool_budgets: ToolBudgets,

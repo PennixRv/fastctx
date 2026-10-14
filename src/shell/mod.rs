@@ -33,8 +33,7 @@ fn default_wait_ms() -> Option<u64> {
 }
 
 /// Parameters for a foreground bash command.
-#[derive(Clone, Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, JsonSchema)]
 pub struct RunRequest {
     /// The bash command line to run (passed to bash).
     pub command: String,
@@ -53,9 +52,39 @@ pub struct RunRequest {
     pub encoding: Option<String>,
 }
 
-/// Parameters for starting a background bash command.
-#[derive(Clone, Debug, Deserialize, JsonSchema)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct RunRequestWire {
+    command: String,
+    cwd: Option<String>,
+    timeout_ms: Option<u64>,
+    #[serde(default = "default_login_shell")]
+    login_shell: bool,
+    encoding: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for RunRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = RunRequestWire::deserialize(deserializer).map_err(|error| {
+            serde::de::Error::custom(format!(
+                "run parameters: {error}. Use 'command', 'cwd', 'timeout_ms', 'login_shell', and 'encoding'; output-size limits are controlled by FastCtx budgets, not a 'max_output_tokens' field."
+            ))
+        })?;
+        Ok(Self {
+            command: wire.command,
+            cwd: wire.cwd,
+            timeout_ms: wire.timeout_ms,
+            login_shell: wire.login_shell,
+            encoding: wire.encoding,
+        })
+    }
+}
+
+/// Parameters for starting a background bash command.
+#[derive(Clone, Debug, JsonSchema)]
 pub struct RunBackgroundRequest {
     /// The bash command line to run (passed to bash).
     pub command: String,
@@ -68,6 +97,35 @@ pub struct RunBackgroundRequest {
     /// Default source encoding for this job's output when shown by job_output (WHATWG label
     /// like "gbk"). Each job_output call may override it.
     pub encoding: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RunBackgroundRequestWire {
+    command: String,
+    cwd: Option<String>,
+    #[serde(default = "default_login_shell")]
+    login_shell: bool,
+    encoding: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for RunBackgroundRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = RunBackgroundRequestWire::deserialize(deserializer).map_err(|error| {
+            serde::de::Error::custom(format!(
+                "run_background parameters: {error}. Use 'command', 'cwd', 'login_shell', and 'encoding'; do not pass 'max_output_tokens'."
+            ))
+        })?;
+        Ok(Self {
+            command: wire.command,
+            cwd: wire.cwd,
+            login_shell: wire.login_shell,
+            encoding: wire.encoding,
+        })
+    }
 }
 
 /// Parameters for querying a background job.
@@ -342,4 +400,22 @@ fn resolve_cwd(input: Option<&str>, session_cwd: &std::path::Path) -> Result<Pat
         None => session_cwd.to_path_buf(),
     };
     Ok(canonical_existing(&path).unwrap_or(path))
+}
+
+#[cfg(test)]
+mod parameter_tests {
+    use super::RunRequest;
+
+    #[test]
+    fn invalid_run_parameters_explain_the_output_budget_boundary() {
+        let error = serde_json::from_value::<RunRequest>(serde_json::json!({
+            "command": "printf ok",
+            "max_output_tokens": 1000
+        }))
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("run parameters"));
+        assert!(error.contains("max_output_tokens"));
+        assert!(error.contains("FastCtx budgets"));
+    }
 }

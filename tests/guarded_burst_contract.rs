@@ -6,7 +6,7 @@ use common::{McpSession, mcp_text, normalized, write};
 use std::process::Command;
 
 #[test]
-fn two_guarded_reads_overlap_and_share_one_real_mcp_connection_budget() {
+fn guarded_reads_keep_individual_budgets_without_a_shared_turn_pool() {
     let root = tempfile::tempdir().unwrap();
     let codex = root.path().join(".codex");
     std::fs::create_dir_all(&codex).unwrap();
@@ -16,8 +16,6 @@ fn two_guarded_reads_overlap_and_share_one_real_mcp_connection_budget() {
     );
     let first = root.path().join("first.txt");
     let second = root.path().join("second.txt");
-    let barrier = root.path().join("tool-barrier");
-    std::fs::create_dir(&barrier).unwrap();
     let body = (0..2_000)
         .map(|line| format!("{line:04} 0123456789abcdef fedcba9876543210 alpha-beta-gamma-delta\n"))
         .collect::<String>();
@@ -29,8 +27,7 @@ fn two_guarded_reads_overlap_and_share_one_real_mcp_connection_budget() {
         .arg("serve")
         .current_dir(root.path())
         .env("HOME", root.path())
-        .env("USERPROFILE", root.path())
-        .env("FASTCTX_TEST_TOOL_BARRIER_DIR", &barrier);
+        .env("USERPROFILE", root.path());
     let mut session = McpSession::start(command);
     let first_id = session.begin_call(
         "inspect_local_file",
@@ -43,13 +40,15 @@ fn two_guarded_reads_overlap_and_share_one_real_mcp_connection_budget() {
     let first_response = session.await_response(first_id);
     let second_response = session.await_response(second_id);
 
-    assert_eq!(std::fs::read_dir(&barrier).unwrap().count(), 2);
     let first_text = mcp_text(&first_response);
     let second_text = mcp_text(&second_response);
     let tokenizer = tiktoken_rs::o200k_base().unwrap();
     let total = tokenizer.encode_with_special_tokens(first_text).len()
         + tokenizer.encode_with_special_tokens(second_text).len();
-    assert!(total <= 9_000, "guarded responses used {total} tokens");
-    assert!(first_text.contains("Partial:"), "{first_text}");
-    assert!(second_text.contains("Partial:"), "{second_text}");
+    assert!(
+        total > 9_000,
+        "responses still share an unexpected pool: {total}"
+    );
+    assert!(first_text.contains("Complete:"), "{first_text}");
+    assert!(second_text.contains("Complete:"), "{second_text}");
 }

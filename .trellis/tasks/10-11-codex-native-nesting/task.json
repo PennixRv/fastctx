@@ -1,0 +1,54 @@
+{
+  "id": "codex-native-nesting",
+  "name": "codex-native-nesting",
+  "title": "FastCtx Codex 原生嵌套接入与输出完整性",
+  "description": "承接根任务 N02/D11/D12，取消 mcp__fastctx 强制 direct-only，保留直接调用和其他 owner 原生边界；规划受管配置升级回退、实际宿主暴露、聚合输出和续页完整性门，批准后实施并完成必要发布重装。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "penn",
+  "assignee": "penn",
+  "createdAt": "2026-10-11",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "execution_class": "planned",
+    "delivery_mode": "change_bearing",
+    "planning": {
+      "revision": 2,
+      "seal": {
+        "revision": 2,
+        "task_id": "codex-native-nesting",
+        "task_name": "10-11-codex-native-nesting",
+        "documents": [
+          "prd.md",
+          "design.md",
+          "implement.md"
+        ],
+        "document_digests": {
+          "prd.md": "9412d26ea074a7bb048d3b52f52dd6357bc5c84cdc2d746a955aa53e72d97bb0",
+          "design.md": "3ed6ae21517cc86ee6739a0f8565a2173af74511169a77bd3b784c316b1ae4f2",
+          "implement.md": "27bb6544589a042e2804ac2200f857f6870b43dd5dc4c7e73bdadede092de8b2"
+        },
+        "execution_class": "planned",
+        "delivery_mode": "change_bearing",
+        "sealed_at": "2026-10-14T12:15:20.311174+00:00"
+      },
+      "approved_revision": 2,
+      "approval_basis": "用户已明确批准上述三个当前封口版本进入实施，包含 FastCtx owner revision 2。",
+      "approved_at": "2026-10-14T12:18:47.213985+00:00"
+    },
+    "root_task": "/home/penn/devel/codex-workflow-optimization/.trellis/tasks/10-14-fastctx-output-pool-recovery"
+  }
+}

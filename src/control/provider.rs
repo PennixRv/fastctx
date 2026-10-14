@@ -1,13 +1,8 @@
 //! Read-only Codex provider detection and effective output-limit policy.
 
-use crate::control::settings::{Tier, ToolBudgetLevel, ToolBudgetPreferences, ToolBudgets};
+use crate::control::settings::{Tier, ToolBudgetPreferences, ToolBudgets};
 use std::path::Path;
 use toml_edit::Item;
-
-/// Host-side output ceiling used when a provider contract requires protection.
-pub const GUARDED_HOST_LIMIT: i64 = 10_000;
-/// FastCtx response budget kept below the Guarded host ceiling.
-pub const GUARDED_FASTCTX_BUDGET: usize = 9_000;
 
 /// Where the configured provider route originates.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -105,7 +100,7 @@ impl ProviderDetection {
         }
     }
 
-    /// Whether the Guarded output policy should be active when protection is enabled.
+    /// Whether provider compatibility protection should be active when enabled.
     pub const fn requires_guard(&self) -> bool {
         matches!(
             self.provenance,
@@ -128,7 +123,7 @@ impl ProviderDetection {
 pub enum EffectiveOutputMode {
     /// The user's selected tier is effective.
     SelectedTier,
-    /// The provider route is unverified or compacts locally, so Guarded ceilings are effective.
+    /// The provider route is unverified or compacts locally, so provider protection is active.
     Guarded,
 }
 
@@ -323,25 +318,12 @@ pub fn effective_output(
     detection: &ProviderDetection,
 ) -> EffectiveOutput {
     if guard_enabled && detection.requires_guard() {
-        let defaults = ToolBudgets {
-            read: ToolBudgetLevel::Inherit,
-            grep: ToolBudgetLevel::Inherit,
-            glob: ToolBudgetLevel::Inherit,
-            run: ToolBudgetLevel::Inherit,
-            job_output: ToolBudgetLevel::Inherit,
-        };
         EffectiveOutput {
             selected_tier,
             mode: EffectiveOutputMode::Guarded,
-            host_limit: GUARDED_HOST_LIMIT,
-            fastctx_budget: GUARDED_FASTCTX_BUDGET,
-            tool_budgets: ToolBudgets {
-                read: preferences.read.unwrap_or(defaults.read),
-                grep: preferences.grep.unwrap_or(defaults.grep),
-                glob: preferences.glob.unwrap_or(defaults.glob),
-                run: preferences.run.unwrap_or(defaults.run),
-                job_output: preferences.job_output.unwrap_or(defaults.job_output),
-            },
+            host_limit: selected_tier.host_limit(),
+            fastctx_budget: selected_tier.fastctx_budget(),
+            tool_budgets: preferences.resolve(selected_tier),
         }
     } else {
         EffectiveOutput {
@@ -380,8 +362,7 @@ fn is_azure_responses_provider(name: &str, base_url: Option<&str>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        CodexCompaction, EffectiveOutputMode, GUARDED_FASTCTX_BUDGET, GUARDED_HOST_LIMIT,
-        ProviderProvenance, detect_bytes, effective_output,
+        CodexCompaction, EffectiveOutputMode, ProviderProvenance, detect_bytes, effective_output,
     };
     use crate::control::settings::{Tier, ToolBudgetLevel, ToolBudgetPreferences};
 
@@ -578,7 +559,7 @@ mod tests {
     }
 
     #[test]
-    fn guarded_output_preserves_the_tier_preference_and_explicit_shares() {
+    fn guarded_output_preserves_the_tier_and_explicit_shares() {
         let detection = detect_bytes(Some(
             b"model_provider='custom'\n[model_providers.custom]\nname='Third Party'\n",
         ));
@@ -589,11 +570,11 @@ mod tests {
         let guarded = effective_output(Tier::High, preferences, true, &detection);
         assert_eq!(guarded.selected_tier, Tier::High);
         assert_eq!(guarded.mode, EffectiveOutputMode::Guarded);
-        assert_eq!(guarded.host_limit, GUARDED_HOST_LIMIT);
-        assert_eq!(guarded.fastctx_budget, GUARDED_FASTCTX_BUDGET);
-        assert_eq!(guarded.tool_budgets.read, ToolBudgetLevel::Inherit);
+        assert_eq!(guarded.host_limit, Tier::High.host_limit());
+        assert_eq!(guarded.fastctx_budget, Tier::High.fastctx_budget());
+        assert_eq!(guarded.tool_budgets.read, Tier::High.default_budgets().read);
         assert_eq!(guarded.tool_budgets.grep, ToolBudgetLevel::Percent(37));
-        assert_eq!(guarded.tool_budgets.glob, ToolBudgetLevel::Inherit);
+        assert_eq!(guarded.tool_budgets.glob, Tier::High.default_budgets().glob);
 
         let disabled = effective_output(Tier::High, preferences, false, &detection);
         assert_eq!(disabled.mode, EffectiveOutputMode::SelectedTier);
